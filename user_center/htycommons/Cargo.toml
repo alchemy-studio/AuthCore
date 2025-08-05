@@ -1,0 +1,72 @@
+[package]
+name = "htycommons"
+version = { workspace = true }
+authors = { workspace = true }
+edition = { workspace = true }
+#version = "0.1.0"
+#authors = ["阿男 <l.weinan@gmail.com>"]
+#edition = "2021"
+
+[dependencies]
+aes = { workspace = true }
+anyhow = { workspace = true }
+axum = { workspace = true }
+base64 = { workspace = true }
+block-modes = { workspace = true }
+cbc = { workspace = true }
+chrono = { workspace = true }
+data-encoding = { workspace = true }
+diesel = { workspace = true }
+dotenv = { workspace = true }
+hex = { workspace = true }
+hex-literal = { workspace = true }
+jsonwebtoken = { workspace = true }
+log = { workspace = true }
+log4rs = { workspace = true }
+rand = { workspace = true }
+redis = { workspace = true }
+reqwest = { workspace = true }
+ring = { workspace = true }
+rust-crypto = { workspace = true }
+serde = { workspace = true }
+serde_derive = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+time = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+tracing-appender = { workspace = true }
+uuid = { workspace = true }
+
+
+#aes = "0.8.0"
+#anyhow = "1.0"
+#base64 = "0.13.0"
+#block-modes = "0.9.1"
+#data-encoding = "2.3.1"
+#diesel = { version = "1.4.8", features = ["postgres", "r2d2", "extras", "serde_json", "chrono"] }
+#dotenv = "0.15.0"
+#hex-literal = "0.3.4"
+#jsonwebtoken = "8"
+#log = "0.4.14"
+#log4rs = '1.0.0'
+#rand = "0.8.3"
+#ring = "0.16.20"
+#rust-crypto = "0.2.36"
+#serde_derive = "1.0.2"
+#serde_json = "1.0.2"
+#thiserror = "1.0.29"
+#uuid = { version = "1.0", features = ["serde", "v4"] }
+#axum = "0.5.0"
+#cbc = "0.1.0"
+#chrono = { version = "0.4", features = ["serde"] }
+#hex = "0.4.3"
+#redis = "0.21.3"
+#reqwest = { version = "0.11.1", features = ["blocking", "json"] }
+#serde = { version = "1.0.2", features = ["derive"] }
+#time = { version = "0.3.11", features = ["macros"] }
+#tokio = { version = "1.0", features = ["full"] }
+#tracing = "0.1.31"
+#tracing-subscriber = { version = "0.3", features = ["env-filter", "local-time"] }
+

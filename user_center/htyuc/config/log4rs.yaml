@@ -1,0 +1,26 @@
+# log4rs_demo/config/log4rs.yaml
+
+refresh_rate: 5 seconds
+
+root:
+  level: debug
+  appenders:
+    - stdout
+    - htyuc_append
+appenders:
+  stdout:
+    kind: console
+    encoder:
+      pattern: "{d(%+)(local)} [{t}] {h({l})} {M}:{m}{n}"
+  htyuc_append:
+    kind: file
+    path: "logs/htyuc.log"
+    encoder:
+      pattern: "{d(%+)(local)} [{t}] {h({l})} {M}:{m}{n}"
+
+loggers:
+  htyuc:
+    level: debug
+    appenders:
+      - htyuc_append
+      - stdout

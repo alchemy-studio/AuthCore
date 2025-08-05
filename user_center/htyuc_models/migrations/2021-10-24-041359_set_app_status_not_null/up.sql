@@ -1,0 +1,1 @@
+alter table hty_apps alter column status set not null;-- Your SQL goes here
