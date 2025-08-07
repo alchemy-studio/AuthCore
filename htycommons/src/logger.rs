@@ -86,10 +86,4 @@ pub fn logger_init() -> () {
         .with_writer(stdout)
         .init();
 
-    // let collector = tracing_subscriber::registry()
-    //     .with(EnvFilter::from_default_env().add_directive(tracing::Level::TRACE.into()))
-    //     .with(stdout_log.with_writer(io::stdout))
-    //     .with(fmt::Subscriber::new().with_writer(file_log));
-    //
-    // tracing::collect::set_global_default(collector).expect("Unable to set a global collector");
 }

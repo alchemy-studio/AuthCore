@@ -204,34 +204,6 @@ pub struct SingleVal<T: Debug + Serialize + DeserializeOwned + Clone> {
 
 impl_typed_jsonb_boilerplate!(SingleVal);
 
-//
-// // 因为泛型的原因，这里不能用这个macro了
-// // impl_jsonb_boilerplate!(MultiVals);
-// impl<T: Debug + Serialize + DeserializeOwned + Clone> diesel::deserialize::FromSql<diesel::sql_types::Jsonb, diesel::pg::Pg> for SingleVal<T>
-// {
-//     fn from_sql(bytes: Option<&[u8]>) -> diesel::deserialize::Result<Self> {
-//         let value = <serde_json::Value as diesel::deserialize::FromSql<
-//             diesel::sql_types::Jsonb,
-//             diesel::pg::Pg,
-//         >>::from_sql(bytes)?;
-//         Ok(serde_json::from_value(value)?)
-//     }
-// }
-//
-// impl<T: Debug + Serialize + DeserializeOwned + Clone> diesel::serialize::ToSql<diesel::sql_types::Jsonb, diesel::pg::Pg> for SingleVal<T> {
-//     fn to_sql<W: std::io::Write>(
-//         &self,
-//         out: &mut diesel::serialize::Output<W, diesel::pg::Pg>,
-//     ) -> diesel::serialize::Result {
-//         let value = serde_json::to_value(self)?;
-//         <serde_json::Value as diesel::serialize::ToSql<
-//             diesel::sql_types::Jsonb,
-//             diesel::pg::Pg,
-//         >>::to_sql(&value, out)
-//     }
-// }
-
-
 #[macro_export]
 macro_rules! impl_jsonb_boilerplate {
     ($name: ident) => {

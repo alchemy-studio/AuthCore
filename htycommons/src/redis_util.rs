@@ -184,40 +184,6 @@ pub fn is_key_exist_in_redis(key: &String) -> anyhow::Result<bool> {
     Ok(exist)
 }
 
-// pub fn save_token(token: &HtyToken) -> anyhow::Result<()> {
-//     let _ = dotenv::dotenv();
-//     //Save token to redis
-//     debug!("save_token -> {:?}", token.clone());
-//
-//     let redis_url = get_redis_url().unwrap();
-//
-//     match Client::open(redis_url.clone()) {
-//         Ok(cli) => match cli.get_connection() {
-//             Ok(mut redis_connect) => {
-//                 match redis_connect.set(token.clone().token_id, jwt_encode_token(token.clone()).unwrap())
-//                 {
-//                     Ok(()) => {
-//                         debug!("save token successfully");
-//                         Ok(())
-//                     }
-//                     Err(e) => {
-//                         error!("Failed to save token -> {:?}", e);
-//                         Err(anyhow!(e))
-//                     }
-//                 }
-//             }
-//             Err(e) => {
-//                 error!("redis error! -> {:?}", e);
-//                 Err(anyhow!(e))
-//             }
-//         },
-//         Err(e) => {
-//             error!("redis error! -> {:?}", e);
-//             Err(anyhow!(e))
-//         }
-//     }
-// }
-
 pub fn verify_jwt(jwt_token: &String) -> anyhow::Result<()> {
     dotenv().ok();
     //Save token to redis

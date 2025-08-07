@@ -326,10 +326,6 @@ pub async fn launch_rocket(port: u16, app: Router) {
         .unwrap();
 }
 
-// pub fn setup_rocket(port: u16) -> Rocket<Build> {
-//     let figment = rocket::Config::figment().merge(("port", port));
-//     rocket::custom(figment)
-// }
 
 //------------------------------------------------
 
@@ -430,13 +426,6 @@ pub fn skip_wx_push() -> bool {
 pub fn get_domain() -> String {
     env::var("DOMAIN")
         .expect("DOMAIN not set!!!")
-        .parse()
-        .unwrap()
-}
-
-pub fn get_music_room_app_domain() -> String {
-    env::var("MUSIC_ROOM_MINI_DOMAIN")
-        .expect("MUSIC_ROOM_MINI_DOMAIN not set!!!")
         .parse()
         .unwrap()
 }
@@ -567,8 +556,3 @@ pub struct ReqCommonQuery {
     pub vals: Option<Vec<String>>,
 }
 
-// impl Debug for HtyErr {
-//     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-//         write!(f, "{} -> {}", self.code, self.reason.as_ref().unwrap_or(&"".to_string()))
-//     }
-// }

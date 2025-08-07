@@ -51,45 +51,6 @@ pub fn get_upyun_operator() -> String {
 pub fn get_upyun_password() -> String {
     env::var("UPYUN_PASSWORD").expect("UPYUN_PASSWORD not set⚠️")
 }
-// pub fn generate_upyun_token(upyun_params: &UpyunParams) -> UpYunAuth {
-//     let mut hasher1 = Md5::new();
-//     let policy = Policy {
-//         expiration: upyun_params.expiration,
-//         save_key: upyun_params.uri.to_string(),
-//         bucket: format!("{}", "huiwing"),
-//     };
-//     hasher1.input(env::var("OPERATOR_PWD").expect("OPERATOR_PWD must be set").as_bytes());
-//
-//     let concat_str = format!("{}&{}&{}",
-//                              &upyun_params.method,
-//                              &upyun_params.uri,
-//                              &upyun_params.date);
-//     let signed_key =
-//         hmac::Key::new(hmac::HMAC_SHA1_FOR_LEGACY_USE_ONLY,
-//                        hasher1.result_str().as_bytes());
-//
-//     let auth = hmac::sign(&signed_key, concat_str.as_bytes());
-//     let b64_encoded_sig = BASE64.encode(auth.as_ref());
-//
-//     let policy_str = serde_json::to_string(&policy).unwrap();
-//     let policy_str_base64 = BASE64.encode(policy_str.as_bytes());
-//
-//     let sign_str = format!("{}&{}",
-//                            policy_str_base64,
-//                            env::var("FORM_API_KEY").expect("FORM_API_KEY must be set"));
-//
-//     let mut hasher2 = Md5::new();
-//     hasher2.input(&sign_str.as_bytes());
-//
-//     UpYunAuth {
-//         auth: format!("{} {}:{}",
-//                       "UPYUN",
-//                       env::var("OPERATOR").expect("OPERATOR must be set"),
-//                       b64_encoded_sig),
-//         sign: hasher2.result_str(),
-//         policy: policy_str_base64,
-//     }
-// }
 
 #[derive(Debug, Default, Serialize, Deserialize, PartialEq, Clone)]
 pub struct UpyunFilename {

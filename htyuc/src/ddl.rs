@@ -5,18 +5,15 @@ use htycommons::db::{get_uc_db_url};
 use htycommons::common::{APP_STATUS_ACTIVE, current_local_datetime, env_var};
 use htycommons::uuid;
 use htycommons::cert::{generate_cert_key_pair};
-use htyuc_models::models::{HtyApp, HtyLabel, HtyRole, HtyTag, HtyTagRef, AppRole, HtyUser, RoleLabel, UserAppInfo, UserInfoRole, AppFromTo};
+use htyuc_models::models::{HtyApp, HtyLabel, HtyRole, HtyTag, HtyTagRef, AppRole, HtyUser, RoleLabel, UserAppInfo, UserInfoRole};
 use tracing::info;
 use tracing::debug;
-use htycommons::web::get_music_room_app_domain;
 
 pub fn uc_ddl() {
     let uc_pool = db::pool(&get_uc_db_url());
     debug!("uc_pool -> {:?}", uc_pool.state());
 
     // let conn = &mut uc_pool.get().unwrap();
-
-    let gongzhonghao_app = insert_wx_gongzhonghao(&mut uc_pool.get().unwrap());
 
     let root_app = insert_root_app(&mut uc_pool.get().unwrap());
     let root_tag = insert_root_tag(&mut uc_pool.get().unwrap());
@@ -33,29 +30,6 @@ pub fn uc_ddl() {
     insert_admin_label(&mut uc_pool.get().unwrap(), &admin_role_id.clone());
     insert_admin_user(&admin_app.app_id, &admin_role_id.clone(), &mut uc_pool.get().unwrap());
 
-    let xiaochengxu_music_room_app_id = insert_music_room_xiaochengxu_app(&mut uc_pool.get().unwrap()).app_id;
-
-    let from_to_record = AppFromTo {
-        id: uuid(),
-        from_app_id: xiaochengxu_music_room_app_id.clone(),
-        to_app_id: gongzhonghao_app.app_id.clone(),
-        is_enabled: true,
-    };
-
-    debug!("FROM_TO_RECORD -> {:?}", &from_to_record);
-    let _ = AppFromTo::create(&from_to_record, &mut uc_pool.get().unwrap());
-
-    let teacher_role_id = insert_teacher_role(&xiaochengxu_music_room_app_id, &mut uc_pool.get().unwrap()).hty_role_id;
-    let student_role_id = insert_student_role(&xiaochengxu_music_room_app_id, &mut uc_pool.get().unwrap()).hty_role_id;
-    insert_music_room_teacher(&xiaochengxu_music_room_app_id, Some(&teacher_role_id), &mut uc_pool.get().unwrap());
-    insert_music_room_student(&xiaochengxu_music_room_app_id, &student_role_id, "李雷".to_string(), "lilei".to_string(), &mut uc_pool.get().unwrap());
-    insert_music_room_student(&xiaochengxu_music_room_app_id, &student_role_id, "韩梅梅".to_string(), "hanmeimei".to_string(), &mut uc_pool.get().unwrap());
-
-
-    let tester_role_id = insert_tester_role(&xiaochengxu_music_room_app_id, &mut uc_pool.get().unwrap());
-    let _ = insert_tester_label(&mut uc_pool.get().unwrap(), &tester_role_id.clone());
-
-    insert_role_tester_user(&xiaochengxu_music_room_app_id.clone(), &tester_role_id.clone(), &mut uc_pool.get().unwrap());
 }
 
 pub fn insert_root_tag(conn: &mut PgConnection) -> HtyTag {
@@ -432,31 +406,6 @@ pub fn insert_admin_user(app_id: &String, role_id: &String, conn: &mut PgConnect
     let _user_info_role_c = UserInfoRole::create(&user_info_role, conn);
 
     admin_user
-}
-
-pub fn insert_music_room_xiaochengxu_app(conn: &mut PgConnection) -> HtyApp {
-    info!("insert music room app...");
-
-    let app_key_pair = generate_cert_key_pair().unwrap();
-
-    let app_id = uuid();
-    let mini_app = HtyApp {
-        app_id: app_id.clone(),
-        domain: Some(get_music_room_app_domain()),
-        app_desc: Some("music room 小程序 app".to_string()),
-        app_status: APP_STATUS_ACTIVE.to_string().clone(),
-        pubkey: Some(app_key_pair.pubkey.unwrap()),
-        privkey: Some(app_key_pair.privkey.unwrap()),
-        wx_id: env_var("MUSIC_ROOM_WX_MINI_ID"),
-        wx_secret: Some(env_var("MUSIC_ROOM_WX_MINI_SECRET").unwrap()),
-        is_wx_app: Some(true),
-    };
-
-    HtyApp::create(&mini_app, conn).ok();
-
-    info!("inserted music room app... {}, {}", mini_app.domain.clone().unwrap(), mini_app.wx_id.clone().unwrap());
-
-    mini_app
 }
 
 pub fn insert_teacher_role(app_id: &String, conn: &mut PgConnection) -> HtyRole {
