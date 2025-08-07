@@ -1,8 +1,5 @@
-// #[macro_use]
-// extern crate diesel;
 extern crate dotenv;
 extern crate htycommons;
-// #[macro_use]
 extern crate serde_derive;
 
 use axum::routing::post;
@@ -16,7 +13,6 @@ use diesel::PgConnection;
 use std::collections::HashMap;
 use std::ops::DerefMut;
 use std::sync::Arc;
-// use axum::http::StatusCode;
 use axum::response::IntoResponse;
 use axum_macros::debug_handler;
 use reqwest::header::{HeaderValue, CONTENT_TYPE};
@@ -40,11 +36,7 @@ use tracing::{debug, warn, error};
 use htycommons::models::*;
 
 pub mod ddl;
-// pub mod models;
 pub mod r_uc;
-// mod schema;
-// needed by htyws
-// #[cfg(test)]
 mod notifications;
 pub mod test_scaffold;
 
@@ -612,11 +604,6 @@ fn raw_find_users(
         resp_users_with_info.push(user_with_info);
     }
 
-    // let resp_users_with_info: Vec<ReqHtyUserWithInfos> = found_users
-    //     .iter()
-    //     .map(|user| raw_find_user_with_info_by_id(&user.hty_id.clone(), extract_conn(conn).deref_mut()))
-    //     .collect();
-
     Ok((resp_users_with_info, total_page, total))
 }
 
@@ -704,8 +691,6 @@ fn raw_find_all_apps_with_roles(db_pool: Arc<DbState>) -> anyhow::Result<Vec<Req
 
 async fn find_role_by_key(
     Path(key): Path<String>,
-    // _sudoer: HtySudoerTokenHeader,
-    // host: HtyHostHeader,
     conn: db::DbConn,
 ) -> Json<HtyResponse<ReqHtyRole>> {
     debug!("find_role_by_key -> starts");
@@ -1194,7 +1179,6 @@ fn raw_create_or_update_tags(req_tag: ReqHtyTag, db_pool: Arc<DbState>) -> anyho
     Ok(())
 }
 
-// todo: @buddy 检查去重
 async fn create_tag_ref(
     _sudoer: HtySudoerTokenHeader,
     State(db_pool): State<Arc<DbState>>,
@@ -1458,11 +1442,6 @@ async fn raw_register_verify(
 
     let register_verify_copy = register_verify.clone();
 
-    // let in_app = get_app_from_host(
-    //     (*host).clone(),
-    //     extract_conn(fetch_db_conn(&db_pool)?).deref_mut(),
-    // )?;
-
     let in_app = HtyApp::find_by_id(&register_verify.clone().app_id.unwrap(),
                                     extract_conn(fetch_db_conn(&db_pool)?).deref_mut())?;
     debug!("raw_register_verify -> in_app: {:?}", in_app);
@@ -1717,21 +1696,10 @@ async fn raw_register(
         extract_conn(fetch_db_conn(&db_pool)?).deref_mut(),
     )?;
 
-    // let user_union_id_copy = to_create_user_union_id.clone().unwrap();
-
     for to_app in to_apps {
         let to_app_id = to_app.clone().to_app_id;
 
-        // let user_union_id = to_create_user_union_id.clone().ok_or(HtyErr {
-        //     code: HtyErrCode::NullErr,
-        //     reason: Some("union id is null".into()),
-        // })?;
-
-        // let to_app = HtyApp::find_by_id(&to_app_id, extract_conn(fetch_db_conn(&db_pool)?).deref_mut())?;
-        // let to_app_open_id = find_wx_openid_by_hty_app(&user_union_id, &to_app).await?;
         debug!("raw_register() -> to_app_id {:?}", &to_app_id);
-        // debug!("raw_register() -> to_app {:?}", &to_app);
-        // debug!("raw_register() -> to_app_open_id {:?}", &to_app_open_id);
 
         let to_user_app_info = UserAppInfo {
             hty_id: to_create_user_hty_id.clone(),
@@ -1779,25 +1747,9 @@ async fn raw_register(
                 avatar_url: None,
             };
 
-            // let mut out_roles = Vec::new();
-            //
-            // let out_role = ReqHtyRole {
-            //     hty_role_id: Some(created_user_info_role_copy.the_id.clone()),
-            //     user_app_info_id: None,
-            //     app_ids: None,
-            //     role_name: None,
-            //     role_desc: None,
-            //     role_status: None,
-            //     labels: None,
-            //     actions: None,
-            // };
-            //
-            // out_roles.push(out_role);
-            // out_info.roles = Some(out_roles);
 
             Ok(out_info)
 
-            // Ok((user.hty_id, user_app_info.id, user_info_role.the_id))
         };
 
         let _created_user_info = exec_read_write_task(
@@ -1805,8 +1757,6 @@ async fn raw_register(
             Some(params),
             extract_conn(fetch_db_conn(&db_pool)?).deref_mut(),
         )?;
-
-        // resp_user_infos.push(user_info);
 
         debug!("raw_register -> start post_registration");
 
@@ -2069,9 +2019,6 @@ async fn raw_update_official_account_openid(
         }
         Err(_) => {
             debug!("raw_update_official_account_openid -> UPDATE user_info / app_open_id 获取失败 / {:?}", &to_update_info);
-            // user_app_info.reject_reason = Some(String::from("app_open_id 获取失败"));
-            // let info = UserAppInfo::update(&user_app_info, extract_conn(fetch_db_conn(&db_pool)?).deref_mut())?;
-            // debug!("raw_update_official_account_openid -> user_app_info {:?}", &info);
         }
     }
 
@@ -2788,12 +2735,6 @@ fn raw_get_user_groups_of_current_user(
     )?;
     debug!("raw_get_user_groups_of_current_user -> find_by_created_by_or_users END: {:?} / {:?}", current_local_datetime(), res);
 
-    // debug!("raw_get_user_groups_of_current_user -> res_is_delete_false : {:?}", current_local_datetime());
-    // let res_is_delete_false: Vec<HtyUserGroup> = res
-    //     .into_iter()
-    //     .filter(|item| item.is_delete == false)
-    //     .collect();
-
     debug!("raw_get_user_groups_of_current_user -> req_res START: {:?}", current_local_datetime());
     let req_res = res
         .iter()
@@ -3115,10 +3056,6 @@ fn raw_create_or_update_user_with_info(
 
     let (user, info) =
         verify_user_with_info(&user_with_info, &db_pool, &app_domain)?;
-
-    // debug!("raw_create_or_update_user_with_info -> in_hty_id : {:?}", in_hty_id);
-    // debug!("raw_create_or_update_user_with_info -> user : {:?}", user);
-    // debug!("raw_create_or_update_user_with_info -> info : {:?}", info);
 
     debug!("raw_create_or_update_user_with_info -> raw_create_or_update_user_with_info_tx");
 
@@ -3504,24 +3441,6 @@ fn raw_create_or_update_apps_with_roles(
                 role_id: id_role.clone(),
             };
             let _ = AppRole::create(&entry, conn)?;
-
-            // match AppRole::verify_exist_by_app_id_and_role_id(&in_app.app_id, &role_id, conn) {
-            //     Ok(_) => {
-            //         let entry = AppRole {
-            //             the_id: uuid().clone(),
-            //             app_id: in_app.clone().app_id,
-            //             role_id: role_id.clone(),
-            //         };
-            //         AppRole::create(&entry, conn)?;
-            //     }
-            //     Err(e) => {
-            //         return Err(anyhow!(HtyErr {
-            //             code: HtyErrCode::DbErr,
-            //             reason: Some(e.to_string()),
-            //         }));
-            //     }
-            //     _ => (),
-            // }
         }
     }
 
@@ -3558,14 +3477,7 @@ fn raw_find_tongzhi_by_id(
     conn: &mut PgConnection,
 ) -> anyhow::Result<Option<HtyTongzhi>> {
     let some_in_tongzhi = HtyTongzhi::find_by_id2(tongzhi_id, conn)?;
-
-    // NOTE: this should call `update_tongzhi_by_id()`
-    // if some_in_tongzhi.tongzhi_status == UNREAD {
-    //     some_in_tongzhi.tongzhi_status = READ.to_string();
-    // }
-
-    // let req_res = in_tongzhi.to_req();
-    return Ok(some_in_tongzhi);
+    Ok(some_in_tongzhi)
 }
 
 async fn create_tongzhi(
@@ -4023,11 +3935,7 @@ fn raw_create_or_update_roles(
     Ok(role.clone())
 }
 
-// #[post(
-// "/create_or_update_actions",
-// format = "application/json",
-// data = "<hty_action>"
-// )]
+
 async fn create_or_update_actions(
     _sudoer: HtySudoerTokenHeader,
     State(db_pool): State<Arc<DbState>>,
@@ -4244,11 +4152,6 @@ fn raw_create_or_update_actions(
     Ok(action.clone())
 }
 
-// #[post(
-// "/create_or_update_labels",
-// format = "application/json",
-// data = "<hty_label>"
-// )]
 async fn create_or_update_labels(
     _sudoer: HtySudoerTokenHeader,
     State(db_pool): State<Arc<DbState>>,
@@ -4502,7 +4405,6 @@ fn raw_delete_user_group(id: &String, db_pool: Arc<DbState>) -> anyhow::Result<(
     Ok(())
 }
 
-// #[post("/delete_app_by_id/<id>")]
 async fn delete_app_by_id(
     _sudoer: HtySudoerTokenHeader,
     Path(id): Path<String>,
@@ -4715,7 +4617,6 @@ fn raw_find_users_with_info_by_role(
         .iter()
         .map(|item| {
             let user = HtyUser::find_by_hty_id(&item.clone().hty_id.unwrap(), conn).unwrap();
-            // let req_user = user.to_req_user();
             let mut infos = Vec::new();
             infos.push(item.clone());
             let out = ReqHtyUserWithInfos {
@@ -5084,7 +4985,6 @@ async fn raw_find_user_with_info_by_token(
 
     let mut out_user_info = UserAppInfo::to_req(&info);
     out_user_info.roles = Some(req_roles);
-    // out_user_info.unread_tongzhi_count = Some(unread_tongzhi_count.len() as i32);
 
     let out_user = HtyUser::to_req_user(&in_user);
     let mut infos = Vec::new();
@@ -5640,7 +5540,6 @@ fn raw_login2_with_unionid_tx(
 pub async fn post_login(
     login_user: &HtyUser,
     from_app: &HtyApp,
-    // _db_conn: db::DbConn,
     conn: &mut PgConnection,
 ) -> anyhow::Result<()> {
     if skip_post_login() {
@@ -5794,14 +5693,10 @@ pub async fn refresh_openid(
         .clone()
         .unwrap();
 
-    // unimplemented!()
-
     match raw_refresh_openid(&id_user, &id_user_app_info, db_conn, db_pool).await {
         Ok(ok) => wrap_json_ok_resp(ok),
         Err(e) => wrap_json_anyhow_err(e),
     }
-
-    // wrap_json_ok_resp("ok".to_string())
 }
 
 async fn raw_refresh_openid(
@@ -6014,7 +5909,6 @@ async fn raw_find_hty_resources_by_task_id(
     Ok(ret)
 }
 
-// #[post("/verify_jwt_token")]
 pub async fn verify_jwt_token(
     host: HtyHostHeader,
     auth: AuthorizationHeader,
@@ -6069,7 +5963,6 @@ async fn raw_verify_jwt_token(auth: AuthorizationHeader) -> anyhow::Result<()> {
 }
 
 pub async fn login_with_cert(
-    // _host: HtyHostHeader,
     hty_host: HtyHostHeader,
     conn: db::DbConn,
     Json(req_cert): Json<ReqCert>,
@@ -6144,13 +6037,6 @@ async fn generate_key_pair(
     }
 }
 
-// DANGEROUS!!!
-// DON'T OPEN IT!!!
-// #[post(
-// "/get_encrypt_id_with_pubkey",
-// format = "application/json",
-// data = "<req_pubkey>"
-// )]
 pub async fn get_encrypt_id_with_pubkey(
     _host: HtyHostHeader,
     req_pubkey: Json<ReqPubkey>,
@@ -6218,53 +6104,6 @@ async fn raw_wx_get_jsapi_ticket(
     let app = HtyApp::find_by_domain(&domain, extract_conn(fetch_db_conn(&db_pool)?).deref_mut())?;
     Ok(get_jsapi_ticket(&app).await?)
 }
-
-// MOVE TO OPENRESTY
-// return task_id
-
-// async fn wx_audio_download(_sudoer: HtySudoerTokenHeader, host: HtyHostHeader, conn: db::DbConn, media_id: String) -> Json<HtyResponse<String>> {
-//     // TODO: Currently return a mocked task_id
-//     wrap_json_ok_resp(uuid())
-//     // debug!("wx_audio_download -> starts");
-//     // match raw_wx_audio_download(host, conn, &media_id).await {
-//     //     Ok(res) => wrap_json_ok_resp(res),
-//     //     Err(e) => {
-//     //         error!("wx_audio_download -> failed to wx_audio_download, e: {}", e);
-//     //         wrap_json_anyhow_err(e)
-//     //     }
-//     // }
-// }
-
-// async fn raw_wx_audio_download(host: HtyHostHeader, conn: db::DbConn, media_id: &String) -> anyhow::Result<String> {
-//     let domain = *host;
-//     let app = HtyApp::find_by_domain(domain, extract_conn(fetch_db_conn(&db_pool)?).deref_mut())?;
-//     let token = get_access_token(&app).await?;
-//
-//     let client = reqwest::Client::new();
-//     let url = "https://api.weixin.qq.com/cgi-bin/media/get";
-//     let resp = client
-//         .get(url)
-//         .query(&[("access_token", token.as_str()), ("media_id", media_id.as_str())])
-//         .send().await?;
-//     let path = format!("/tmp/voice_file_{}.speex", uuid()).to_string();
-//     let mut file = std::fs::File::create(path.as_str())?;
-//     let bytes = resp.bytes().await?;
-//     file.write_all(bytes.as_ref())?;
-//
-//     // let mut convert_file = file_convert(&path)?;
-//     //
-//     // let mut buf = vec![0_u8; 1024];
-//     // let _r = convert_file.write_all(&mut buf);
-//
-//     // Ok(base64::encode(&buf))
-//
-//     // TODO: Currently return a mocked task_id
-//     Ok(uuid())
-// }
-
-// fn file_convert(_path: &String) -> anyhow::Result<File> {
-//     unimplemented!()
-// }
 
 pub async fn wx_get_access_token(
     _sudoer: HtySudoerTokenHeader,
