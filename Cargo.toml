@@ -6,6 +6,7 @@ resolver = "2"
 version = "0.1.0"
 authors = ["阿男 <l.weinan@gmail.com>", "buddy", "moicen", "xiaolitongxue666"]
 edition = "2021"
+license = "MIT"
 
 [workspace.dependencies]
 aes = "^0.8"
