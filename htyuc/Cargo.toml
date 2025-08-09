@@ -1,0 +1,76 @@
+[package]
+name = "htyuc"
+version = { workspace = true }
+authors = { workspace = true }
+edition = { workspace = true }
+#version = "0.1.0"
+#authors = ["阿男 <l.weinan@gmail.com>"]
+#edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+aes = { workspace = true }
+anyhow = { workspace = true }
+axum = { workspace = true }
+axum-macros = { workspace = true }
+base64 = { workspace = true }
+block-modes = { workspace = true }
+chrono = { workspace = true }
+data-encoding = { workspace = true }
+diesel = { workspace = true }
+dotenv = { workspace = true }
+hex = { workspace = true }
+hex-literal = { workspace = true }
+htycommons = { path = "../htycommons" }
+htyuc_models = { path = "../htyuc_models" }
+jsonwebtoken = { workspace = true }
+log = { workspace = true }
+log4rs = { workspace = true }
+rand = { workspace = true }
+reqwest = { workspace = true }
+ring = { workspace = true }
+rust-crypto = { workspace = true }
+serde = { workspace = true }
+serde_derive = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+time = { workspace = true }
+tokio = { workspace = true }
+tower-http = { workspace = true }
+tracing = { workspace = true }
+tracing-appender = { workspace = true }
+tracing-subscriber = { workspace = true }
+uuid = { workspace = true }
+
+#aes = "0.8.0"
+#anyhow = "1.0"
+#axum = "0.5.0"
+#axum-macros = "0.2.0"
+#base64 = "0.13.0"
+#block-modes = "0.9.1"
+#chrono = { version = "0.4", features = ["serde"] }
+#data-encoding = "2.3.1"
+#diesel = { version = "1.4.8", features = ["postgres", "r2d2", "extras", "serde_json", "chrono"] }
+#dotenv = "0.15.0"
+#hex = "0.4.3"
+#hex-literal = "0.3.1"
+#htycommons = { path = "../htycommons" }
+#jsonwebtoken = "8"
+#log = "0.4.14"
+#log4rs = '1.0.0'
+#rand = "0.8.3"
+#reqwest = { version = "0.11.1", features = ["blocking", "json"] }
+#ring = "0.16.19"
+#rust-crypto = "0.2.36"
+#serde = { version = "1.0.2", features = ["derive"] }
+#serde_derive = "1.0.2"
+#serde_json = "1.0.2"
+#thiserror = "1.0.29"
+#time = "0.3.11"
+#tokio = { version = "1.0", features = ["full"] }
+#tower-http = { version = "0.3.0", features = ["trace"] }
+#tracing = "0.1.31"
+#tracing-appender = "0.2.0"
+#tracing-subscriber = { version = "0.3", features = ["env-filter", "local-time"] }
+#uuid = { version = "1.0", features = ["serde", "v4"] }

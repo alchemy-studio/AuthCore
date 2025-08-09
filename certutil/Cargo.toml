@@ -1,0 +1,32 @@
+[package]
+name = "certutil"
+version = { workspace = true }
+authors = { workspace = true }
+edition = { workspace = true }
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+aes = { workspace = true }
+anyhow = { workspace = true }
+base64 = { workspace = true }
+block-modes = { workspace = true }
+chrono = { workspace = true }
+data-encoding = { workspace = true }
+diesel = { workspace = true }
+dotenv = { workspace = true }
+hex = { workspace = true }
+hex-literal = { workspace = true }
+htycommons = { path = "../htycommons" }
+jsonwebtoken = { workspace = true }
+log = { workspace = true }
+log4rs = { workspace = true }
+rand = { workspace = true }
+reqwest = { workspace = true }
+ring = { workspace = true }
+rust-crypto = { workspace = true }
+serde = { workspace = true }
+serde_derive = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+uuid = { workspace = true }
