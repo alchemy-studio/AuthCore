@@ -5288,48 +5288,31 @@ async fn raw_wx_qr_login(code: String, app_domain: String, db_pool: Arc<DbState>
     save_token_with_exp_days(&resp_token, get_token_expiration_days())?;
     Ok(jwt_encode_token(resp_token)?)
 }
+pub async fn verify_user_enabled_and_registered_in_app(app_domain: String, hty_id: String, db_pool: Arc<DbState>) -> anyhow::Result<bool> {
 
+    let in_user = HtyUser::find_by_hty_id(&hty_id, extract_conn(fetch_db_conn(&db_pool)?).deref_mut())?;
 
+    debug!("verify_user_enabled_in_app -> in_user: {:?}", &in_user);
 
-// fixme: todo: 额外的认证放这里
-// verify_user_in_other_app
-pub async fn verify_user_in_other_app() {
-    // 此处存在用户扫码第一次登录本app的场景:
-    //
-    // 1. 拿这个用户对应的小程序[注释a]的`user_app_info`.
-    // 2. 如果存在,说明此用户在小程序[注释a]注册过(但不一定是TEACHER,也就是说此处不负责检查用户角色) (条件: a. 此用户hty_app_user是已经启用状态 b. 此用户对应的小程序app[注释a]的user_app_info是已经验证状态: 都是is_enabled为true)[注释b]
-    // 3. 如果以上验证失败, 则直接此处二维码登录失败(没有注册过小程序[注释a],或者注册过但未验证的用户不允许二维码扫码登录)
-    // 4. 如果此用户在小程序[注释a]存在`user_app_info`,而此处扫码对此app没有对应的`user_app_info`,说明此用户为*第一次扫码登录*本app,则*需要为这个用户创建一条此app的`user_app_info` (第一次登录)* (其实和小程序第一次登录的逻辑是类似的)
-    // 5. 后续登录因为已经存在针对本app的user_app_info,所以可以检查本user_app_info的验证状态(如果是未验证状态则本次登录失败)
-    //
-    // 注释:
-    //
-    // a. 小程序具体指env里面对应`MUSIC_ROOM_MINI_DOMAIN`这个key所属域名的hty_app:
-    // 例如: MUSIC_ROOM_MINI_DOMAIN=music-room.huiwings.cn
-    // 查询逻辑:读取这个变量获得对应域名,然后找到对应小程序app
-    //
-    // b. 以及不需要做角色检查了,第一次登录所创建的`user_app_info`对应角色为空
-    //
+    let in_app = HtyApp::find_by_domain(&app_domain, extract_conn(fetch_db_conn(&db_pool)?).deref_mut())?;
 
-    unimplemented!()
-    // let music_room_domain = get_music_room_app_domain();
-    // let music_room_app = HtyApp::find_by_domain(&music_room_domain, extract_conn(fetch_db_conn(&db_pool)?).deref_mut())?;
-    //
-    // let user_is_exist_in_music_room_app = UserAppInfo::verify_exist_by_app_id_and_hty_id(&user.hty_id, &music_room_app.app_id, extract_conn(fetch_db_conn(&db_pool)?).deref_mut())?;
-    //
-    // debug!("raw_wx_qr_login -> user_is_exist_in_music_room_app: {:?}", &user_is_exist_in_music_room_app);
-    //
-    // if !user_is_exist_in_music_room_app {
-    //     return Err(anyhow!("No record for this user in MUSIC ROOM!"));
-    // }
-    //
-    // let music_room_user_info = UserAppInfo::find_by_hty_id_and_app_id(&user.hty_id, &music_room_app.app_id, extract_conn(fetch_db_conn(&db_pool)?).deref_mut())?;
-    //
-    // debug!("raw_wx_qr_login -> music_room_user_info: {:?}", &music_room_user_info);
-    //
-    // if !user.enabled || !music_room_user_info.is_registered {
-    //     return Err(anyhow!("User is not enabled or is not registered in MUSIC ROOM!"));
-    // }
+    let is_user_info_exists = UserAppInfo::verify_exist_by_app_id_and_hty_id(&hty_id, &in_app.app_id, extract_conn(fetch_db_conn(&db_pool)?).deref_mut())?;
+
+    debug!("verify_user_enabled_in_app -> user_is_exist_in_music_room_app: {:?}", &is_user_info_exists);
+
+    if !is_user_info_exists {
+        return Err(anyhow!("user info not exists!"));
+    }
+
+    let user_info = UserAppInfo::find_by_hty_id_and_app_id(&hty_id, &in_app.app_id, extract_conn(fetch_db_conn(&db_pool)?).deref_mut())?;
+
+    debug!("verify_user_enabled_in_app -> user_info: {:?}", &user_info);
+
+    if in_user.enabled || user_info.is_registered {
+        Ok(true)
+    } else {
+        Ok(false)
+    }
 }
 
 // buddy: todo fix deprecated macro
@@ -5512,7 +5495,7 @@ fn raw_login2_with_unionid_tx(
         }
     };
 
-    return match exec_read_write_task(
+    match exec_read_write_task(
         Box::new(task),
         Some(no_use),
         extract_conn(fetch_db_conn(&db_pool)?).deref_mut(),
@@ -5540,7 +5523,7 @@ fn raw_login2_with_unionid_tx(
                 e.to_string()
             )),
         })),
-    };
+    }
 }
 
 // 登录过程没有`sudoerToken`
