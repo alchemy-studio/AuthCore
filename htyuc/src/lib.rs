@@ -5292,13 +5292,13 @@ pub async fn verify_user_enabled_and_registered_in_app(app_domain: String, hty_i
 
     let in_user = HtyUser::find_by_hty_id(&hty_id, extract_conn(fetch_db_conn(&db_pool)?).deref_mut())?;
 
-    debug!("verify_user_enabled_in_app -> in_user: {:?}", &in_user);
+    debug!("verify_user_enabled_and_registered_in_app -> in_user: {:?}", &in_user);
 
     let in_app = HtyApp::find_by_domain(&app_domain, extract_conn(fetch_db_conn(&db_pool)?).deref_mut())?;
 
     let is_user_info_exists = UserAppInfo::verify_exist_by_app_id_and_hty_id(&hty_id, &in_app.app_id, extract_conn(fetch_db_conn(&db_pool)?).deref_mut())?;
 
-    debug!("verify_user_enabled_in_app -> user_is_exist_in_music_room_app: {:?}", &is_user_info_exists);
+    debug!("verify_user_enabled_and_registered_in_app -> user_is_exist_in_music_room_app: {:?}", &is_user_info_exists);
 
     if !is_user_info_exists {
         return Err(anyhow!("user info not exists!"));
@@ -5306,7 +5306,7 @@ pub async fn verify_user_enabled_and_registered_in_app(app_domain: String, hty_i
 
     let user_info = UserAppInfo::find_by_hty_id_and_app_id(&hty_id, &in_app.app_id, extract_conn(fetch_db_conn(&db_pool)?).deref_mut())?;
 
-    debug!("verify_user_enabled_in_app -> user_info: {:?}", &user_info);
+    debug!("verify_user_enabled_and_registered_in_app -> user_info: {:?}", &user_info);
 
     if in_user.enabled || user_info.is_registered {
         Ok(true)
