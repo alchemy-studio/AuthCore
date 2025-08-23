@@ -5288,7 +5288,17 @@ async fn raw_wx_qr_login(code: String, app_domain: String, db_pool: Arc<DbState>
     save_token_with_exp_days(&resp_token, get_token_expiration_days())?;
     Ok(jwt_encode_token(resp_token)?)
 }
-pub async fn verify_user_enabled_and_registered_in_app(app_domain: String, hty_id: String, db_pool: Arc<DbState>) -> anyhow::Result<bool> {
+
+async fn verify_user_enabled_and_registered_in_app(_sudoer: HtySudoerTokenHeader,
+                                      _host: HtyHostHeader,
+                                      Query(params): Query<HashMap<String, String>>,
+                                      conn: db::DbConn) -> Json<HtyResponse<HtyUser>> {
+    let in_app_domain = get_some_from_query_params::<String>("app_domain", &params);
+    let in_hty_id = get_some_from_query_params::<String>("hty_id", &params);
+    unimplemented!()
+}
+
+pub async fn raw_verify_user_enabled_and_registered_in_app(app_domain: String, hty_id: String, db_pool: Arc<DbState>) -> anyhow::Result<bool> {
 
     let in_user = HtyUser::find_by_hty_id(&hty_id, extract_conn(fetch_db_conn(&db_pool)?).deref_mut())?;
 
@@ -6561,6 +6571,7 @@ pub fn uc_rocket(db_url: &str) -> Router {
         .route("/api/v1/uc/find_all_user_rels_by_params", get(find_all_user_rels_by_params))
         .route("/api/v1/uc/find_users", get(find_users))
         .route("/api/v1/uc/find_hty_users_by_keyword", get(find_hty_users_by_keyword))
+        .route("/api/v1/uc/verify_user_enabled_and_registered_in_app", get(verify_user_enabled_and_registered_in_app))
         .route("/api/v1/uc/find_tongzhis", get(find_tongzhis))
         .route("/api/v1/uc/find_all_tongzhis_with_page", get(find_all_tongzhis_with_page))
         .route(
