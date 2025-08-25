@@ -5292,10 +5292,27 @@ async fn raw_wx_qr_login(code: String, app_domain: String, db_pool: Arc<DbState>
 async fn verify_user_enabled_and_registered_in_app(_sudoer: HtySudoerTokenHeader,
                                       _host: HtyHostHeader,
                                       Query(params): Query<HashMap<String, String>>,
-                                      conn: db::DbConn) -> Json<HtyResponse<HtyUser>> {
+                                      State(db_pool): State<Arc<DbState>>) -> Json<HtyResponse<bool>> {
     let in_app_domain = get_some_from_query_params::<String>("app_domain", &params);
     let in_hty_id = get_some_from_query_params::<String>("hty_id", &params);
-    unimplemented!()
+
+    if in_app_domain.is_none() || in_hty_id.is_none() {
+        return wrap_json_hty_err::<bool>(HtyErr {
+            code: HtyErrCode::WebErr,
+            reason: Some("app_domain or hty_id is none".into()),
+        });
+    }
+
+    match raw_verify_user_enabled_and_registered_in_app(in_app_domain.unwrap(), in_hty_id.unwrap(), db_pool).await {
+        Ok(result) => {
+            debug!("verify_user_enabled_and_registered_in_app -> success: {:?}", result);
+            wrap_json_ok_resp(result)
+        }
+        Err(e) => {
+            error!("verify_user_enabled_and_registered_in_app -> failed, e: {:?}", e);
+            wrap_json_anyhow_err(e)
+        }
+    }
 }
 
 pub async fn raw_verify_user_enabled_and_registered_in_app(app_domain: String, hty_id: String, db_pool: Arc<DbState>) -> anyhow::Result<bool> {
@@ -6509,7 +6526,7 @@ pub fn uc_rocket(db_url: &str) -> Router {
         .route("/api/v1/uc/sudo2/{to_user_id}", get(sudo2))
         .route("/api/v1/uc/login_with_password", post(login_with_password))
         .route("/api/v1/uc/login2_with_unionid", get(login2_with_unionid))
-        // .route("/api/v1/uc/wx_qr_login", post(wx_qr_login))
+        .route("/api/v1/uc/wx_qr_login", post(wx_qr_login))
         .route(
             "/api/v1/uc/find_hty_resources_by_task_id/{task_id}",
             get(find_hty_resources_by_task_id),
