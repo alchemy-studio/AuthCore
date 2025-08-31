@@ -14,6 +14,9 @@
 
 <img width="2560" height="1415" alt="11291756617743_ pic" src="https://github.com/user-attachments/assets/35079b01-4ffd-4eb9-ae47-26fdf241ea4c" />
 
+- 慧添翼架构设计：https://huiwings.cn/arch
+- 慧添翼小程序展示：https://huiwings.cn/show
+
 ## 📋 目录
 
 - [项目简介](#项目简介)
