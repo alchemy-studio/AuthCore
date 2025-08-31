@@ -7,6 +7,11 @@
 
 一个基于 Rust 构建的高性能身份认证和用户管理系统，提供完整的 JWT 认证、用户管理、文件上传等功能。
 
+
+<img width="2560" height="1415" alt="55611756617535_ pic" src="https://github.com/user-attachments/assets/fd1446bd-f8ec-48ef-9221-0652394cebb5" />
+
+<img width="2560" height="1415" alt="55621756617596_ pic" src="https://github.com/user-attachments/assets/6beac327-81f3-4ec1-a14b-3a15d4ff248d" />
+
 ## 📋 目录
 
 - [项目简介](#项目简介)
