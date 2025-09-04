@@ -934,36 +934,16 @@ dependencies = [
 name = "htyuc_models"
 version = "0.1.0"
 dependencies = [
- "aes",
  "anyhow",
- "axum",
- "base64 0.22.1",
- "block-modes",
  "chrono",
- "data-encoding",
  "diesel",
- "dotenv",
- "hex",
- "hex-literal",
  "htycommons",
- "jsonwebtoken",
  "log",
- "log4rs",
- "rand 0.8.5",
  "reqwest",
- "ring",
- "rust-crypto",
  "serde",
- "serde_derive",
  "serde_json",
- "thiserror 1.0.69",
- "time 0.3.41",
  "tokio",
- "tower-http",
  "tracing",
- "tracing-appender",
- "tracing-subscriber",
- "uuid",
 ]
 
 [[package]]
