@@ -1,7 +1,6 @@
 use htycommons::common::{HtyErr, HtyErrCode, HtyResponse, string_to_date};
 use htycommons::web::wrap_hty_err;
 use htycommons::logger::{debug, info};
-use htycommons::wx::{WxUser, WxParams, wx_decode};
 
 #[test]
 pub fn test_datetime() {
@@ -29,7 +28,7 @@ pub fn test_flatten_err() {
     let json1 = serde_json::to_string(&resp1);
 
     debug(format!("{:?}", json1).as_str());
-    assert_eq!("{\"r\":false,\"d\":null,\"e\":\"InternalErr -> for test\"}".to_string(), json1.unwrap());
+    assert_eq!("{\"r\":false,\"d\":null,\"e\":\"InternalErr -> for test\",\"hty_err\":{\"code\":\"InternalErr\",\"reason\":\"for test\"}}".to_string(), json1.unwrap());
 
 
     let resp2: HtyResponse<String> = wrap_hty_err(
@@ -39,5 +38,5 @@ pub fn test_flatten_err() {
         });
     let json2 = serde_json::to_string(&resp2);
     debug(format!("{:?}", json2).as_str());
-    assert_eq!("{\"r\":false,\"d\":null,\"e\":\"CommonError -> InternalErr -> for test\"}".to_string(), json2.unwrap());
+    assert_eq!("{\"r\":false,\"d\":null,\"e\":\"CommonError -> InternalErr -> for test\",\"hty_err\":{\"code\":\"CommonError\",\"reason\":\"InternalErr -> for test\"}}".to_string(), json2.unwrap());
 }
