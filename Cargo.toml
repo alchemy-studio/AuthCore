@@ -9,6 +9,12 @@ edition = "2021"
 license = "MIT"
 
 [workspace.dependencies]
+# Internal packages
+htycommons = { path = "htycommons" }
+htyuc_models = { path = "htyuc_models" }
+htyuc_remote = { path = "htyuc_remote" }
+
+# External dependencies
 aes = "^0.8"
 anyhow = "^1.0"
 axum = { version = "^0.8"}
