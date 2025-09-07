@@ -3,14 +3,17 @@ name = "htyuc_models"
 version = { workspace = true }
 authors = { workspace = true }
 edition = { workspace = true }
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+description = "User management models for HTY projects"
+license = { workspace = true }
+repository = "https://github.com/alchemy-studio/AuthCore"
+keywords = ["models", "user", "management", "diesel"]
+categories = ["database", "web-programming::http-server"]
 
 [dependencies]
+htycommons = { workspace = true }
 anyhow = { workspace = true }
 chrono = { workspace = true }
 diesel = { workspace = true }
-htycommons = { path = "../htycommons" }
 log = { workspace = true }
 reqwest = { workspace = true }
 serde = { workspace = true }
