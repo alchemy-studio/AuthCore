@@ -32,7 +32,7 @@ hex = "^0.4"
 hex-literal = "^0.4"
 jsonwebtoken = "^9.3"
 log = "^0.4"
-log4rs = "^1.2"
+log4rs = "^1.4"
 quote = "=1.0.23" # required by diesel currently
 rand = "^0.8"
 redis = "^0.24"
