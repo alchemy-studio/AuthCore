@@ -16,6 +16,7 @@
 - [功能特性](#功能特性)
 - [技术栈](#技术栈)
 - [快速开始](#快速开始)
+- [作为依赖使用](#作为依赖使用)
 - [项目结构](#项目结构)
 - [API 文档](#api-文档)
 - [配置说明](#配置说明)
@@ -121,6 +122,108 @@ diesel migration run
 ```bash
 # 启动用户中心服务
 cargo run --bin htyuc
+```
+
+## 📦 作为依赖使用
+
+AuthCore 提供了多个独立的包，可以在你的 Rust 项目中作为依赖使用。
+
+### 可用的包
+
+- **htycommons**: 通用工具库，包含分页、数据库操作、JWT 处理等
+- **htyuc_models**: 用户管理相关的数据模型
+- **htyuc_remote**: 远程服务客户端
+- **htyuc**: 完整的用户管理服务
+
+### 在 Cargo.toml 中使用
+
+#### 使用 Git 依赖（推荐）
+
+```toml
+[dependencies]
+# 通用工具库
+htycommons = { git = "https://github.com/alchemy-studio/AuthCore.git", package = "htycommons" }
+
+# 用户管理模型
+htyuc_models = { git = "https://github.com/alchemy-studio/AuthCore.git", package = "htyuc_models" }
+
+# 远程服务客户端
+htyuc_remote = { git = "https://github.com/alchemy-studio/AuthCore.git", package = "htyuc_remote" }
+
+# 完整的用户管理服务
+htyuc = { git = "https://github.com/alchemy-studio/AuthCore.git", package = "htyuc" }
+```
+
+#### 使用本地路径依赖
+
+```toml
+[dependencies]
+htycommons = { path = "../AuthCore/htycommons" }
+htyuc_models = { path = "../AuthCore/htyuc_models" }
+htyuc_remote = { path = "../AuthCore/htyuc_remote" }
+htyuc = { path = "../AuthCore/htyuc" }
+```
+
+### 使用示例
+
+#### 使用 htycommons 进行分页
+
+```rust
+use htycommons::pagination::*;
+use diesel::prelude::*;
+
+// 在你的查询中使用分页
+let (results, total_pages, total_count) = users
+    .paginate(Some(1))
+    .per_page(Some(10))
+    .load_and_count_pages(&mut conn)?;
+```
+
+#### 使用 htyuc_models 进行用户管理
+
+```rust
+use htyuc_models::models::*;
+use htycommons::db::*;
+
+// 创建用户
+let new_user = NewUser {
+    username: "test_user".to_string(),
+    email: "test@example.com".to_string(),
+    // ... 其他字段
+};
+
+let user = insert_into(users::table)
+    .values(&new_user)
+    .get_result(&mut conn)?;
+```
+
+#### 使用 htyuc_remote 调用远程服务
+
+```rust
+use htyuc_remote::remote_calls::*;
+
+// 调用远程用户服务
+let user_info = get_user_by_id("user_id", &client).await?;
+```
+
+### 工作区依赖配置
+
+如果你在 Cargo 工作区中使用，可以在根目录的 `Cargo.toml` 中配置：
+
+```toml
+[workspace.dependencies]
+htycommons = { git = "https://github.com/alchemy-studio/AuthCore.git", package = "htycommons" }
+htyuc_models = { git = "https://github.com/alchemy-studio/AuthCore.git", package = "htyuc_models" }
+htyuc_remote = { git = "https://github.com/alchemy-studio/AuthCore.git", package = "htyuc_remote" }
+htyuc = { git = "https://github.com/alchemy-studio/AuthCore.git", package = "htyuc" }
+
+# 然后在各个成员包中使用
+[package]
+name = "my_project"
+
+[dependencies]
+htycommons = { workspace = true }
+htyuc_models = { workspace = true }
 
 # 或使用提供的脚本
 ./htyuc/start.sh
