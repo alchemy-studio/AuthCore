@@ -354,7 +354,7 @@ pub fn get_music_room_mini_url() -> String {
 }
 
 pub fn random_port() -> u16 {
-    rand::thread_rng().gen_range(10000..20000)
+    rand::rng().random_range(10000..20000)
 }
 
 pub fn get_uc_port() -> u16 {
@@ -365,12 +365,12 @@ pub fn get_uc_port() -> u16 {
 }
 
 pub fn generate_ports() {
-    let mut rng = rand::thread_rng();
-    let uc_port = rng.gen_range(10000..20000);
-    let mut ws_port = rng.gen_range(10000..20000);
+    let mut rng = rand::rng();
+    let uc_port = rng.random_range(10000..20000);
+    let mut ws_port = rng.random_range(10000..20000);
 
     while ws_port == uc_port {
-        ws_port = rng.gen_range(10000..20000);
+        ws_port = rng.random_range(10000..20000);
     }
 
     set_uc_port(uc_port);
