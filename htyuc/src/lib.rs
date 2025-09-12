@@ -813,52 +813,58 @@ async fn bulk_update_tag_ref(
 }
 
 fn raw_bulk_update_tag_ref(
-    req_tag_refs_by_ref_id: ReqTagRefsByRefId,
+    mut req_tag_refs_by_ref_id: ReqTagRefsByRefId,
     db_pool: Arc<DbState>,
 ) -> anyhow::Result<ReqTagRefsByRefId> {
-    let ref_id = req_tag_refs_by_ref_id.ref_id.clone().unwrap();
+    let ref_id = req_tag_refs_by_ref_id.ref_id.take().unwrap();
+    let cloned_req_tag_refs = req_tag_refs_by_ref_id.tag_refs.take().unwrap_or(Vec::new());
 
-    let cloned_req_tag_refs = req_tag_refs_by_ref_id.tag_refs.clone().unwrap_or(Vec::new());
+    // 将数据放入 HashMap 中传递给闭包
+    let mut params = HashMap::new();
+    params.insert("ref_id".to_string(), ref_id);
+    params.insert("tag_refs".to_string(), serde_json::to_string(&cloned_req_tag_refs)?);
 
-    let mut cloned_req_tag_refs_by_ref_id = req_tag_refs_by_ref_id.clone();
+    let task_update = |in_params: Option<HashMap<String, String>>,
+                      conn: &mut PgConnection|
+                      -> anyhow::Result<Vec<ReqHtyTagRef>> {
+        let params = in_params.unwrap();
+        let ref_id = params.get("ref_id").unwrap().clone();
+        let tag_refs_json = params.get("tag_refs").unwrap();
+        let cloned_req_tag_refs: Vec<ReqHtyTagRef> = serde_json::from_str(tag_refs_json)?;
 
-    let task_update = move |_in_params: Option<HashMap<String, String>>,
-                            conn: &mut PgConnection|
-                            -> anyhow::Result<Vec<ReqHtyTagRef>> {
         let _ = HtyTagRef::delete_all_by_ref_id(&ref_id, conn)?;
 
         let mut res_tag_refs = vec![];
-        for req_tag_ref in cloned_req_tag_refs.clone() {
+        for mut req_tag_ref in cloned_req_tag_refs {
             if req_tag_ref.hty_tag_id.is_none() || req_tag_ref.ref_type.is_none() {
                 return Err(anyhow!(HtyErr {
                     code: HtyErrCode::WebErr,
                     reason: Some("hty_tag_id or ref_type can not be none".into())
                 }));
             }
-            let mut new_req_tag_ref = req_tag_ref.clone();
             let new_id = uuid();
             let db_tag_ref = HtyTagRef {
                 the_id: new_id.clone(),
-                hty_tag_id: req_tag_ref.hty_tag_id.clone().unwrap(),
+                hty_tag_id: req_tag_ref.hty_tag_id.take().unwrap(),
                 ref_id: ref_id.clone(),
-                ref_type: req_tag_ref.ref_type.clone().unwrap(),
-                meta: req_tag_ref.meta.clone(),
+                ref_type: req_tag_ref.ref_type.take().unwrap(),
+                meta: req_tag_ref.meta.take(),
             };
             let _ = HtyTagRef::create(&db_tag_ref, conn)?;
-            new_req_tag_ref.tag_ref_id = Some(new_id.clone());
-            res_tag_refs.push(new_req_tag_ref.clone());
+            req_tag_ref.tag_ref_id = Some(new_id);
+            res_tag_refs.push(req_tag_ref);
         }
         Ok(res_tag_refs)
     };
-    let params = HashMap::new();
+    
     let res_tag_refs = exec_read_write_task(
         Box::new(task_update),
         Some(params),
         extract_conn(fetch_db_conn(&db_pool)?).deref_mut(),
     )?;
 
-    cloned_req_tag_refs_by_ref_id.tag_refs = Some(res_tag_refs.clone());
-    Ok(cloned_req_tag_refs_by_ref_id)
+    req_tag_refs_by_ref_id.tag_refs = Some(res_tag_refs);
+    Ok(req_tag_refs_by_ref_id)
 }
 
 async fn find_tags_by_ref_id(
@@ -3368,7 +3374,7 @@ async fn create_or_update_apps_with_roles(
     Json(hty_app): Json<ReqHtyApp>,
 ) -> Json<HtyResponse<ReqHtyApp>> {
     debug!("create_or_update_apps_with_roles -> starts");
-    match raw_create_or_update_apps_with_roles(&hty_app, extract_conn(conn).deref_mut()) {
+    match raw_create_or_update_apps_with_roles(hty_app, extract_conn(conn).deref_mut()) {
         Ok(res) => wrap_json_ok_resp(res),
         Err(e) => {
             error!(
@@ -3381,12 +3387,10 @@ async fn create_or_update_apps_with_roles(
 }
 
 fn raw_create_or_update_apps_with_roles(
-    hty_app: &ReqHtyApp,
+    mut hty_app: ReqHtyApp,
     conn: &mut PgConnection,
 ) -> anyhow::Result<ReqHtyApp> {
-    let mut req_app = hty_app.clone();
-
-    if req_app.app_status.is_none() {
+    if hty_app.app_status.is_none() {
         return Err(anyhow!(HtyErr {
             code: HtyErrCode::NullErr,
             reason: Some("app_status is none".into()),
@@ -3396,26 +3400,25 @@ fn raw_create_or_update_apps_with_roles(
     let in_app;
     let mut is_new_app = false;
 
-    if req_app.app_id.is_none() {
-        req_app.app_id = Some(uuid());
+    if hty_app.app_id.is_none() {
+        hty_app.app_id = Some(uuid());
         is_new_app = true;
     }
 
-    let cloned = req_app.clone();
-
+    let app_id = hty_app.app_id.clone().unwrap();
     in_app = HtyApp {
-        app_id: cloned.app_id.unwrap(),
-        wx_secret: cloned.wx_secret,
-        domain: cloned.domain,
-        app_status: cloned.app_status.unwrap(),
-        app_desc: cloned.app_desc,
-        pubkey: cloned.pubkey,
-        privkey: cloned.privkey,
-        wx_id: cloned.wx_id,
-        is_wx_app: cloned.is_wx_app,
+        app_id: app_id.clone(),
+        wx_secret: hty_app.wx_secret.take(),
+        domain: hty_app.domain.take(),
+        app_status: hty_app.app_status.take().unwrap(),
+        app_desc: hty_app.app_desc.take(),
+        pubkey: hty_app.pubkey.take(),
+        privkey: hty_app.privkey.take(),
+        wx_id: hty_app.wx_id.take(),
+        is_wx_app: hty_app.is_wx_app.take(),
     };
 
-    let exist = HtyApp::verify_exist_by_id(&req_app.app_id.clone().unwrap(), conn)?;
+    let exist = HtyApp::verify_exist_by_id(&app_id, conn)?;
 
     if exist {
         HtyApp::update(&in_app, conn)?;
@@ -3425,26 +3428,26 @@ fn raw_create_or_update_apps_with_roles(
 
     // 1. 如果传进来为空，则删除所有roles
     // 2. 如果不为空，更新为传进来的关系
-    if req_app.role_ids.clone().is_none() {
+    if hty_app.role_ids.is_none() {
         if !is_new_app {
-            let _ = AppRole::delete_all_by_app_id(&req_app.app_id.clone().unwrap(), conn)?;
+            let _ = AppRole::delete_all_by_app_id(&app_id, conn)?;
         }
     } else {
         // 先删后增
         // todo: 未来可能重构逻辑
-        let _ = AppRole::delete_all_by_app_id(&req_app.app_id.clone().unwrap(), conn)?;
-        let roles = req_app.role_ids.clone().unwrap();
+        let _ = AppRole::delete_all_by_app_id(&app_id, conn)?;
+        let roles = hty_app.role_ids.take().unwrap();
         for id_role in roles {
             let entry = AppRole {
-                the_id: uuid().clone(),
-                app_id: in_app.clone().app_id,
-                role_id: id_role.clone(),
+                the_id: uuid(),
+                app_id: app_id.clone(),
+                role_id: id_role,
             };
             let _ = AppRole::create(&entry, conn)?;
         }
     }
 
-    Ok(req_app)
+    Ok(hty_app)
 }
 
 async fn find_tongzhi_by_id(
@@ -4991,16 +4994,16 @@ async fn raw_find_user_with_info_by_token(
     infos.push(out_user_info);
 
     let req_hty_user_with_infos = ReqHtyUserWithInfos {
-        hty_id: out_user.hty_id.clone(),
-        union_id: out_user.union_id.clone(),
-        enabled: out_user.enabled.clone(),
-        created_at: out_user.created_at.clone(),
-        real_name: out_user.real_name.clone(),
-        sex: out_user.sex.clone(),
-        mobile: out_user.mobile.clone(),
+        hty_id: out_user.hty_id,
+        union_id: out_user.union_id,
+        enabled: out_user.enabled,
+        created_at: out_user.created_at,
+        real_name: out_user.real_name,
+        sex: out_user.sex,
+        mobile: out_user.mobile,
         infos: Some(infos),
         info_roles: None,
-        settings: out_user.settings.clone(),
+        settings: out_user.settings,
     };
 
     debug(format!("raw_find_user_with_info_by_token -> req_hty_user_with_infos: {:?}", req_hty_user_with_infos).as_str());
@@ -5013,7 +5016,7 @@ async fn raw_find_user_with_info_by_token(
     task::spawn(async move {
         let _ = post_login(
             &in_user,
-            &in_app.clone(),
+            &in_app,
             extract_conn(fetch_db_conn(&db_pool).unwrap()).deref_mut(),
         )
             .await; // todo: unwrap should be fixed.
