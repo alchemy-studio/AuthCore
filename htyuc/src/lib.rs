@@ -845,10 +845,10 @@ fn raw_bulk_update_tag_ref(
             let new_id = uuid();
             let db_tag_ref = HtyTagRef {
                 the_id: new_id.clone(),
-                hty_tag_id: req_tag_ref.hty_tag_id.take().unwrap(),
+                hty_tag_id: req_tag_ref.hty_tag_id.clone().unwrap(),
                 ref_id: ref_id.clone(),
-                ref_type: req_tag_ref.ref_type.take().unwrap(),
-                meta: req_tag_ref.meta.take(),
+                ref_type: req_tag_ref.ref_type.clone().unwrap(),
+                meta: req_tag_ref.meta.clone(),
             };
             let _ = HtyTagRef::create(&db_tag_ref, conn)?;
             req_tag_ref.tag_ref_id = Some(new_id);
