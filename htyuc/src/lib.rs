@@ -813,13 +813,13 @@ async fn bulk_update_tag_ref(
 }
 
 fn raw_bulk_update_tag_ref(
-    mut req_tag_refs_by_ref_id: ReqTagRefsByRefId,
+    req_tag_refs_by_ref_id: ReqTagRefsByRefId,
     db_pool: Arc<DbState>,
 ) -> anyhow::Result<ReqTagRefsByRefId> {
-    let ref_id = req_tag_refs_by_ref_id.ref_id.take().unwrap();
-    let cloned_req_tag_refs = req_tag_refs_by_ref_id.tag_refs.take().unwrap_or(Vec::new());
+    let ref_id = req_tag_refs_by_ref_id.ref_id.clone().unwrap();
+    let cloned_req_tag_refs = req_tag_refs_by_ref_id.tag_refs.clone().unwrap_or(Vec::new());
 
-    // 将数据放入 HashMap 中传递给闭包
+    // 将数据序列化传递给闭包
     let mut params = HashMap::new();
     params.insert("ref_id".to_string(), ref_id);
     params.insert("tag_refs".to_string(), serde_json::to_string(&cloned_req_tag_refs)?);
@@ -863,8 +863,9 @@ fn raw_bulk_update_tag_ref(
         extract_conn(fetch_db_conn(&db_pool)?).deref_mut(),
     )?;
 
-    req_tag_refs_by_ref_id.tag_refs = Some(res_tag_refs);
-    Ok(req_tag_refs_by_ref_id)
+    let mut result = req_tag_refs_by_ref_id;
+    result.tag_refs = Some(res_tag_refs);
+    Ok(result)
 }
 
 async fn find_tags_by_ref_id(
@@ -3397,7 +3398,6 @@ fn raw_create_or_update_apps_with_roles(
         }));
     };
 
-    let in_app;
     let mut is_new_app = false;
 
     if hty_app.app_id.is_none() {
@@ -3406,16 +3406,16 @@ fn raw_create_or_update_apps_with_roles(
     }
 
     let app_id = hty_app.app_id.clone().unwrap();
-    in_app = HtyApp {
+    let in_app = HtyApp {
         app_id: app_id.clone(),
-        wx_secret: hty_app.wx_secret.take(),
-        domain: hty_app.domain.take(),
-        app_status: hty_app.app_status.take().unwrap(),
-        app_desc: hty_app.app_desc.take(),
-        pubkey: hty_app.pubkey.take(),
-        privkey: hty_app.privkey.take(),
-        wx_id: hty_app.wx_id.take(),
-        is_wx_app: hty_app.is_wx_app.take(),
+        wx_secret: hty_app.wx_secret.clone(),
+        domain: hty_app.domain.clone(),
+        app_status: hty_app.app_status.clone().unwrap(),
+        app_desc: hty_app.app_desc.clone(),
+        pubkey: hty_app.pubkey.clone(),
+        privkey: hty_app.privkey.clone(),
+        wx_id: hty_app.wx_id.clone(),
+        is_wx_app: hty_app.is_wx_app.clone(),
     };
 
     let exist = HtyApp::verify_exist_by_id(&app_id, conn)?;
@@ -3436,7 +3436,7 @@ fn raw_create_or_update_apps_with_roles(
         // 先删后增
         // todo: 未来可能重构逻辑
         let _ = AppRole::delete_all_by_app_id(&app_id, conn)?;
-        let roles = hty_app.role_ids.take().unwrap();
+        let roles = hty_app.role_ids.clone().unwrap();
         for id_role in roles {
             let entry = AppRole {
                 the_id: uuid(),
