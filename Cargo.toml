@@ -25,7 +25,7 @@ cbc = "^0.1"
 chrono = { version = "^0.4", features = ["serde"] }
 clap = { version = "^4.5", features = ["derive", "cargo"] }
 data-encoding = "^2.9"
-diesel = { version = "^2.2", features = ["postgres", "r2d2", "serde_json", "chrono"] }
+diesel = { version = "^2.3", features = ["postgres", "r2d2", "serde_json", "chrono"] }
 diesel-derives = { version = "^2.0" }
 dotenv = "^0.15"
 hex = "^0.4"
