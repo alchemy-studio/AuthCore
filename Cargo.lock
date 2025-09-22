@@ -894,7 +894,7 @@ dependencies = [
  "serde_derive",
  "serde_json",
  "thiserror 2.0.16",
- "time 0.3.43",
+ "time 0.3.44",
  "tokio",
  "tracing",
  "tracing-appender",
@@ -931,7 +931,7 @@ dependencies = [
  "serde_derive",
  "serde_json",
  "thiserror 2.0.16",
- "time 0.3.43",
+ "time 0.3.44",
  "tokio",
  "tower-http",
  "tracing",
@@ -983,7 +983,7 @@ dependencies = [
  "serde_derive",
  "serde_json",
  "thiserror 2.0.16",
- "time 0.3.43",
+ "time 0.3.44",
  "tokio",
  "tower-http",
  "tracing",
@@ -2084,7 +2084,7 @@ dependencies = [
  "num-bigint",
  "num-traits",
  "thiserror 2.0.16",
- "time 0.3.43",
+ "time 0.3.44",
 ]
 
 [[package]]
@@ -2281,11 +2281,12 @@ dependencies = [
 
 [[package]]
 name = "time"
-version = "0.3.43"
+version = "0.3.44"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "83bde6f1ec10e72d583d91623c939f623002284ef622b87de38cfd546cbf2031"
+checksum = "91e7d9e3bb61134e77bde20dd4825b97c010155709965fedf0f49bb138e52a9d"
 dependencies = [
  "deranged",
+ "itoa",
  "libc",
  "num-conv",
  "num_threads",
@@ -2440,7 +2441,7 @@ checksum = "3566e8ce28cc0a3fe42519fc80e6b4c943cc4c8cef275620eb8dac2d3d4e06cf"
 dependencies = [
  "crossbeam-channel",
  "thiserror 1.0.69",
- "time 0.3.43",
+ "time 0.3.44",
  "tracing-subscriber",
 ]
 
@@ -2489,7 +2490,7 @@ dependencies = [
  "sharded-slab",
  "smallvec",
  "thread_local",
- "time 0.3.43",
+ "time 0.3.44",
  "tracing",
  "tracing-core",
  "tracing-log",
