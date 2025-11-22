@@ -63,8 +63,7 @@ pub fn identify2(id: &WxId, app_id: &String, conn: &mut PgConnection) -> anyhow:
                 avatar_url: None,
             };
 
-            hty_id = HtyUser::create_with_info_with_tx(&new_user, &Some(new_info), conn)
-                .ok_or_else(|| anyhow::anyhow!("Failed to create user with info"))?
+            hty_id = HtyUser::create_with_info_with_tx(&new_user, &Some(new_info), conn)?
                 .clone();
 
             Ok(HtyToken {
@@ -422,7 +421,7 @@ pub async fn fn_push_wx_message<T: Send + Clone + Serialize + Debug>(
     let wx_url = "https://api.weixin.qq.com/cgi-bin/message/template/send";
     let wx_push_message_ref = wx_push_message
         .ok_or_else(|| anyhow::anyhow!("wx_push_message is required"))?;
-    let post_body = serde_json::to_string::<ReqWxPushMessage<T>>(wx_push_message_ref)?;
+    let post_body = serde_json::to_string::<ReqWxPushMessage<T>>(&wx_push_message_ref)?;
 
     debug!("fn_push_wx_message -> post wx body {:?} ", post_body);
 

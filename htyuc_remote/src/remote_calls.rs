@@ -78,12 +78,16 @@ pub async fn find_app_by_domain(
         reason: Some("app not found".to_string()),
     })?;
 
+    let app_id = req_app.app_id
+        .ok_or_else(|| anyhow::anyhow!("app_id is required"))?;
+    let app_status = req_app.app_status
+        .ok_or_else(|| anyhow::anyhow!("app_status is required"))?;
     Ok(HtyApp {
-        app_id: req_app.app_id.unwrap(),
+        app_id,
         wx_secret: req_app.wx_secret,
         domain: req_app.domain,
         app_desc: req_app.app_desc,
-        app_status: req_app.app_status.unwrap(),
+        app_status,
         pubkey: req_app.pubkey,
         privkey: req_app.privkey,
         wx_id: req_app.wx_id,
@@ -108,12 +112,16 @@ pub async fn find_app_by_id(id_app: &String, root: &HtySudoerTokenHeader) -> any
         reason: Some("to_app not found".to_string()),
     })?;
 
+    let app_id = req_app.app_id
+        .ok_or_else(|| anyhow::anyhow!("app_id is required"))?;
+    let app_status = req_app.app_status
+        .ok_or_else(|| anyhow::anyhow!("app_status is required"))?;
     Ok(HtyApp {
-        app_id: req_app.app_id.unwrap(),
+        app_id,
         wx_secret: req_app.wx_secret,
         domain: req_app.domain,
         app_desc: req_app.app_desc,
-        app_status: req_app.app_status.unwrap(),
+        app_status,
         pubkey: req_app.pubkey,
         privkey: req_app.privkey,
         wx_id: req_app.wx_id,
@@ -133,17 +141,18 @@ pub async fn find_user_openid_by_hty_id_and_app(
         hty_user, req_user_infos
     );
 
-    let user_infos = req_user_infos.unwrap();
+    let user_infos = req_user_infos
+        .ok_or_else(|| anyhow::anyhow!("user_infos is required"))?;
     let to_user_openid = user_infos
         .iter()
-        .find(|user_info| user_info.app_id.as_ref().unwrap() == &to_app.app_id)
+        .find(|user_info| user_info.app_id.as_ref().map(|id| id == &to_app.app_id).unwrap_or(false))
         .ok_or(HtyErr {
             code: HtyErrCode::NullErr,
             reason: Some("not found a user_app_info to_app!".into()),
         })?
         .openid
         .as_ref()
-        .unwrap();
+        .ok_or_else(|| anyhow::anyhow!("openid is required"))?;
     Ok(to_user_openid.to_string())
 }
 

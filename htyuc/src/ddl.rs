@@ -255,15 +255,16 @@ pub fn insert_wx_gongzhonghao(conn: &mut PgConnection) -> HtyApp {
     info!("insert wx mp app...");
 
 
-    let app_key_pair = generate_cert_key_pair().unwrap();
+    let app_key_pair = generate_cert_key_pair()
+        .expect("Failed to generate cert key pair for wx mp app");
 
     let wx_mp_app = HtyApp {
         app_id: uuid(),
         domain: env_var("WX_MP_DOMAIN"),
         app_desc: Some("微信公众号APP，用于记录公众号信息".to_string()),
         app_status: APP_STATUS_ACTIVE.to_string().clone(),
-        pubkey: Some(app_key_pair.pubkey.unwrap()),
-        privkey: Some(app_key_pair.privkey.unwrap()),
+        pubkey: app_key_pair.pubkey.clone(),
+        privkey: app_key_pair.privkey.clone(),
         wx_id: env_var("WX_MP_ID"),
         wx_secret: env_var("WX_MP_SECRET"),
         is_wx_app: Some(true),
@@ -276,15 +277,16 @@ pub fn insert_wx_gongzhonghao(conn: &mut PgConnection) -> HtyApp {
 
 pub fn insert_root_app(conn: &mut PgConnection) -> HtyApp {
     info!("insert root app...");
-    let app_key_pair = generate_cert_key_pair().unwrap();
+    let app_key_pair = generate_cert_key_pair()
+        .expect("Failed to generate cert key pair for root app");
 
     let root_app = HtyApp {
         app_id: uuid(),
         domain: Some("root".to_string()),
         app_desc: Some("virtual root app".to_string()),
         app_status: APP_STATUS_ACTIVE.to_string().clone(),
-        pubkey: Some(app_key_pair.pubkey.unwrap()),
-        privkey: Some(app_key_pair.privkey.unwrap()),
+        pubkey: app_key_pair.pubkey.clone(),
+        privkey: app_key_pair.privkey.clone(),
         wx_id: None,
         wx_secret: Some("default secret".to_string()),
         is_wx_app: Some(false),
@@ -349,15 +351,16 @@ pub fn insert_root_user(app_id: &String, role_id: &String, conn: &mut PgConnecti
 
 pub fn insert_admin_app(conn: &mut PgConnection) -> HtyApp {
     info!("insert admin app...");
-    let app_key_pair = generate_cert_key_pair().unwrap();
+    let app_key_pair = generate_cert_key_pair()
+        .expect("Failed to generate cert key pair for admin app");
 
     let admin_app = HtyApp {
         app_id: uuid(),
         domain: env_var("ADMIN_DOMAIN"),
         app_desc: Some("admin system".to_string()),
         app_status: APP_STATUS_ACTIVE.to_string().clone(),
-        pubkey: Some(app_key_pair.pubkey.unwrap()),
-        privkey: Some(app_key_pair.privkey.unwrap()),
+        pubkey: app_key_pair.pubkey.clone(),
+        privkey: app_key_pair.privkey.clone(),
         wx_id: None,
         wx_secret: Some("default secret".to_string()),
         is_wx_app: Some(false),
@@ -400,7 +403,9 @@ pub fn insert_admin_user(app_id: &String, role_id: &String, conn: &mut PgConnect
     };
 
     debug!("insert admin user app_id -> {}", app_id.clone());
-    debug!("insert admin user app_id user info ->  {}", admin_user_info.app_id.as_ref().unwrap().clone());
+    if let Some(app_id_ref) = admin_user_info.app_id.as_ref() {
+        debug!("insert admin user app_id user info ->  {}", app_id_ref.clone());
+    }
 
     info!("creating admin user...");
 
@@ -409,7 +414,8 @@ pub fn insert_admin_user(app_id: &String, role_id: &String, conn: &mut PgConnect
         &Some(admin_user_info),
         conn,
     ));
-    let user_info = UserAppInfo::find_by_hty_id_and_app_id(&id_admin, &app_id, conn).unwrap();
+    let user_info = UserAppInfo::find_by_hty_id_and_app_id(&id_admin, &app_id, conn)
+        .expect("Failed to find admin user info after creation");
     let user_info_role = UserInfoRole {
         the_id: uuid(),
         user_info_id: user_info.id.clone(),
@@ -546,7 +552,8 @@ pub fn insert_music_room_student(app_id: &String, role_id: &String, real_name: S
 
     info!("creating student {}...", real_name);
     pass_or_panic2(HtyUser::create_with_info(&student_user, &Some(student_user_info), conn));
-    let user_info = UserAppInfo::find_by_hty_id_and_app_id(&student_user.hty_id.clone(), &app_id.clone(), conn).unwrap();
+    let user_info = UserAppInfo::find_by_hty_id_and_app_id(&student_user.hty_id.clone(), &app_id.clone(), conn)
+        .expect("Failed to find student user info after creation");
     let user_info_role = UserInfoRole {
         the_id: uuid(),
         user_info_id: user_info.id.clone(),
@@ -590,7 +597,9 @@ pub fn insert_role_tester_user(app_id: &String, role_id: &String, conn: &mut PgC
     };
 
     debug!("insert tester user app_id -> {}", app_id.clone());
-    debug!("insert tester user app_id user info ->  {}", tester_user_info.app_id.as_ref().unwrap().clone());
+    if let Some(app_id_ref) = tester_user_info.app_id.as_ref() {
+        debug!("insert tester user app_id user info ->  {}", app_id_ref.clone());
+    }
 
     info!("creating tester user...");
 
@@ -599,7 +608,8 @@ pub fn insert_role_tester_user(app_id: &String, role_id: &String, conn: &mut PgC
         &Some(tester_user_info),
         conn,
     ));
-    let user_info = UserAppInfo::find_by_hty_id_and_app_id(&id_tester, &app_id, conn).unwrap();
+    let user_info = UserAppInfo::find_by_hty_id_and_app_id(&id_tester, &app_id, conn)
+        .expect("Failed to find tester user info after creation");
     let user_info_role = UserInfoRole {
         the_id: uuid(),
         user_info_id: user_info.id.clone(),

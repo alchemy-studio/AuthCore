@@ -127,8 +127,7 @@ impl HtyUser {
         let mut q = hty_users::table.into_boxed();
         q = q.order(created_at.desc());
 
-        if keyword.is_some() {
-            let keyword_copy = keyword.clone().unwrap();
+        if let Some(keyword_copy) = keyword.clone() {
             q = q.filter(
                 real_name
                     .ilike(format!("%{}%", keyword_copy.clone()))
@@ -375,7 +374,11 @@ impl HtyUser {
         let task = move |in_params: Option<HashMap<String, (HtyUser, Option<UserAppInfo>)>>,
                          conn: &mut PgConnection|
                          -> anyhow::Result<String> {
-            let (in_user, in_info) = in_params.unwrap().get("params").unwrap().clone();
+            let params_map = in_params
+                .ok_or_else(|| anyhow::anyhow!("in_params is required"))?;
+            let (in_user, in_info) = params_map.get("params")
+                .ok_or_else(|| anyhow::anyhow!("params key is required"))?
+                .clone();
             match HtyUser::create_with_info(&in_user, &in_info, conn) {
                 Ok(hty_id) => Ok(hty_id),
                 Err(e) => Err(anyhow!(HtyErr {
@@ -472,10 +475,12 @@ impl HtyUser {
 
         let in_user: HtyUser;
 
-        if !user.is_none() {
-            in_user = user.clone().unwrap();
+        if let Some(user_val) = user.clone() {
+            in_user = user_val;
         } else {
-            match HtyUser::find_by_hty_id(info.clone().unwrap().hty_id.as_str(), conn) {
+            let info_val = info.clone()
+                .ok_or_else(|| anyhow::anyhow!("info is required when user is None"))?;
+            match HtyUser::find_by_hty_id(info_val.hty_id.as_str(), conn) {
                 Ok(u) => {
                     in_user = u;
                 }
@@ -669,13 +674,13 @@ impl<T: Clone + Debug + Serialize + DeserializeOwned> ReqHtyTemplateData<T> {
         }
 
         let to_db: HtyTemplateData<T> = HtyTemplateData {
-            id: self.id.clone().unwrap(),
-            app_id: self.app_id.clone().unwrap(),
-            template_id: self.template_id.clone().unwrap(),
+            id: self.id.clone().expect("id should not be None after check"),
+            app_id: self.app_id.clone().expect("app_id should not be None after check"),
+            template_id: self.template_id.clone().expect("template_id should not be None after check"),
             template_val: self.template_val.clone(),
             template_text: self.template_text.clone(),
-            created_at: self.created_at.clone().unwrap(),
-            created_by: self.created_by.clone().unwrap(),
+            created_at: self.created_at.clone().expect("created_at should not be None after check"),
+            created_by: self.created_by.clone().expect("created_by should not be None after check"),
         };
 
         Ok(to_db)
@@ -1113,7 +1118,7 @@ impl UserAppInfo {
         }
 
         match user_app_info::table
-            .filter(user_app_info::id.eq(req_info.id.clone().unwrap()))
+            .filter(user_app_info::id.eq(req_info.id.clone().expect("id should not be None after check")))
             .first::<UserAppInfo>(conn)
         {
             Ok(info) => Ok(info),
@@ -1380,10 +1385,10 @@ impl UserAppInfo {
                 Some(ReqHtyRole {
                     hty_role_id: Some(role.clone().hty_role_id),
                     user_app_info_id: Some(self.clone().id),
-                    app_ids: if self.app_id.is_none() {
-                        None
+                    app_ids: if let Some(app_id) = self.app_id.clone() {
+                        Some(vec![app_id])
                     } else {
-                        Some(vec![self.app_id.clone().unwrap()])
+                        None
                     },
                     role_key: Some(role.clone().role_key),
                     role_desc: role.clone().role_desc,
@@ -1417,13 +1422,13 @@ pub struct ReqHtyTongzhi {
 impl ReqHtyTongzhi {
     pub fn to_db_struct(&self) -> HtyTongzhi {
         HtyTongzhi {
-            tongzhi_id: self.tongzhi_id.clone().unwrap(),
-            app_id: self.app_id.clone().unwrap(),
-            tongzhi_type: self.tongzhi_type.clone().unwrap(),
-            tongzhi_status: self.tongzhi_status.clone().unwrap(),
+            tongzhi_id: self.tongzhi_id.clone().expect("tongzhi_id is required"),
+            app_id: self.app_id.clone().expect("app_id is required"),
+            tongzhi_type: self.tongzhi_type.clone().expect("tongzhi_type is required"),
+            tongzhi_status: self.tongzhi_status.clone().expect("tongzhi_status is required"),
             send_from: self.send_from.clone(),
-            send_to: self.send_to.clone().unwrap(),
-            created_at: self.created_at.clone().unwrap(),
+            send_to: self.send_to.clone().expect("send_to is required"),
+            created_at: self.created_at.clone().expect("created_at is required"),
             content: self.content.clone(),
             meta: self.meta.clone(),
             role_id: self.role_id.clone(), // 一个用户可能有多种角色,每种角色接受各自的通知.(例如:作为学生接收学生通知;作为老师接收老师通知.)
@@ -1484,11 +1489,11 @@ impl ReqUserAppInfo {
         }
 
         Ok(UserAppInfo {
-            hty_id: self.hty_id.clone().unwrap(),
+            hty_id: self.hty_id.clone().expect("hty_id should not be None after check"),
             app_id: self.app_id.clone(),
             openid: self.openid.clone(),
             is_registered: self.is_registered,
-            id: self.id.clone().unwrap(),
+            id: self.id.clone().expect("id should not be None after check"),
             username: self.username.clone(),
             password: self.password.clone(),
             meta: self.meta.clone(),
@@ -1553,11 +1558,13 @@ impl HtyApp {
             .first::<HtyApp>(conn)
         {
             Ok(app) => {
+                let pubkey = app.pubkey.clone()
+                    .ok_or_else(|| anyhow::anyhow!("pubkey is not set for app"))?;
                 debug!(
                     "find_pubkey_by_id -> find pubkey : {}",
-                    app.pubkey.clone().unwrap()
+                    pubkey
                 );
-                Ok(app.pubkey.unwrap())
+                Ok(pubkey)
             }
             Err(e) => {
                 error!("find_pubkey_by_id -> err -> {:?}", e);
@@ -1576,7 +1583,9 @@ impl HtyApp {
             .first::<HtyApp>(conn)
         {
             Ok(app) => {
-                match encrypt_text_with_private_key(app.privkey.unwrap(), app.app_id.clone()) {
+                let privkey = app.privkey
+                    .ok_or_else(|| anyhow::anyhow!("privkey is not set for app"))?;
+                match encrypt_text_with_private_key(privkey, app.app_id.clone()) {
                     Ok(encrypt_app_id) => {
                         debug!(
                             "get_encrypt_app_id -> encrypt app id : {}",
@@ -1856,12 +1865,12 @@ impl HtyResource {
 
         Ok(Self {
             filename: req.filename,
-            app_id: req_app_id.unwrap(),
-            hty_resource_id: req_hty_resource_id.unwrap(),
+            app_id: req_app_id?,
+            hty_resource_id: req_hty_resource_id?,
             created_at: Some(req_created_at),
-            url: req_url.unwrap(),
+            url: req_url?,
             res_type: req.res_type,
-            created_by: Some(req_created_by.unwrap()),
+            created_by: Some(req_created_by?),
             tasks: req.tasks.clone(),
             compress_processed: req.compress_processed.clone(),
             updated_at: req.updated_at.clone(),
@@ -1935,10 +1944,10 @@ impl HtyResource {
 
         Self {
             filename: req.filename,
-            app_id: req_app_id.unwrap(),
+            app_id: req_app_id?,
             hty_resource_id: uuid(),
             created_at: Some(current_local_datetime()),
-            url: req_url.unwrap(),
+            url: req_url?,
             res_type: 1,
             created_by: None,
         }
@@ -3538,30 +3547,31 @@ impl HtyTongzhi {
         hty_id
         );
 
-        if hty_id.is_some() {
+        if let Some(hty_id_val) = hty_id.clone() {
             if keyword.is_some() {
                 //后续如果有新增搜索功能再填充
                 q = q
-                    .filter(send_to.eq(hty_id.unwrap()));
+                    .filter(send_to.eq(hty_id_val.clone()));
 
             } else {
                 q = q
-                    .filter(send_to.eq(hty_id.unwrap()));
+                    .filter(send_to.eq(hty_id_val.clone()));
 
             }
         } else if keyword.is_some() {
             // todo: 这里有keyword搜索吗？
-            q = q
-                .filter(send_to.eq(hty_id.unwrap()));
-
+            if let Some(hty_id_val) = hty_id.clone() {
+                q = q
+                    .filter(send_to.eq(hty_id_val));
+            }
         }
 
-        if the_tongzhi_status.is_some() {
-            q = q.filter(tongzhi_status.eq(the_tongzhi_status.clone().unwrap()))
+        if let Some(tongzhi_status_val) = the_tongzhi_status.clone() {
+            q = q.filter(tongzhi_status.eq(tongzhi_status_val))
         }
 
-        if the_role_id.is_some() {
-            q = q.filter(role_id.eq(the_role_id.clone().unwrap()))
+        if let Some(role_id_val) = the_role_id.clone() {
+            q = q.filter(role_id.eq(role_id_val))
         }
 
         q = q.order(created_at.desc());
@@ -3966,7 +3976,10 @@ impl<T> HtyTemplateData<T>
             .first::<HtyTemplateData<String>>(conn)
         {
             Ok(data) => {
-                let text = data.template_text.unwrap().val.unwrap();
+                let text = data.template_text
+                    .ok_or_else(|| anyhow::anyhow!("template_text is required"))?
+                    .val
+                    .ok_or_else(|| anyhow::anyhow!("template_text.val is required"))?;
                 debug!(
                     "find_with_template_id_and_app_id -> template_text: {:?}",
                     text
@@ -4028,7 +4041,10 @@ impl<T> HtyTemplateData<T>
             .first::<HtyTemplateData<String>>(conn)
         {
             Ok(data) => {
-                let text = data.template_text.unwrap().val.unwrap();
+                let text = data.template_text
+                    .ok_or_else(|| anyhow::anyhow!("template_text is required"))?
+                    .val
+                    .ok_or_else(|| anyhow::anyhow!("template_text.val is required"))?;
                 debug!(
                     "find_with_template_id_and_app_id_with_string -> template_text: {:?}",
                     text
@@ -4203,16 +4219,16 @@ impl HtyUserRels {
         use crate::schema::hty_user_rels::columns::*;
         let mut q = hty_user_rels::table.into_boxed();
 
-        if in_rel_type.is_some() {
-            q = q.filter(rel_type.eq(in_rel_type.clone().unwrap()));
+        if let Some(rel_type_val) = in_rel_type.clone() {
+            q = q.filter(rel_type.eq(rel_type_val));
         }
 
-        if in_from_user_id.is_some() {
-            q = q.filter(from_user_id.eq(in_from_user_id.clone().unwrap()))
+        if let Some(from_user_id_val) = in_from_user_id.clone() {
+            q = q.filter(from_user_id.eq(from_user_id_val))
         }
 
-        if in_to_user_id.is_some() {
-            q = q.filter(to_user_id.eq(in_to_user_id.clone().unwrap()))
+        if let Some(to_user_id_val) = in_to_user_id.clone() {
+            q = q.filter(to_user_id.eq(to_user_id_val))
         }
 
         match q.load::<HtyUserRels>(conn) {
