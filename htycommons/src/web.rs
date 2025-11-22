@@ -275,7 +275,19 @@ pub fn wrap_auth_err(some_err_str: &Option<String>) -> String {
             reason: None,
         }),
     })
-    .unwrap_or_else(|_| "{\"r\":false,\"d\":null,\"e\":\"AuthorizationErr\",\"hty_err\":{\"code\":\"InternalErr\",\"reason\":null}}".to_string())
+    .unwrap_or_else(|_| {
+        // 如果序列化失败，尝试序列化一个简化的响应
+        serde_json::to_string(&HtyResponse::<String> {
+            r: false,
+            d: None,
+            e: Some("AuthorizationErr".to_string()),
+            hty_err: Some(HtyErr {
+                code: HtyErrCode::InternalErr,
+                reason: None,
+            }),
+        })
+        .expect("Failed to serialize simplified HtyResponse")
+    })
 }
 
 pub fn wrap_sudo_err(some_token: &Option<String>) -> String {
@@ -288,7 +300,19 @@ pub fn wrap_sudo_err(some_token: &Option<String>) -> String {
             reason: Some("HtySudoerTokenErr".to_string()),
         }),
     })
-    .unwrap_or_else(|_| "{\"r\":false,\"d\":null,\"e\":\"HtySudoerTokenErr\",\"hty_err\":{\"code\":\"AuthenticationFailed\",\"reason\":\"HtySudoerTokenErr\"}}".to_string())
+    .unwrap_or_else(|_| {
+        // 如果序列化失败，尝试序列化一个简化的响应
+        serde_json::to_string(&HtyResponse::<String> {
+            r: false,
+            d: None,
+            e: Some("HtySudoerTokenErr".to_string()),
+            hty_err: Some(HtyErr {
+                code: HtyErrCode::AuthenticationFailed,
+                reason: Some("HtySudoerTokenErr".to_string()),
+            }),
+        })
+        .expect("Failed to serialize simplified HtyResponse")
+    })
 }
 
 pub fn wrap_anyhow_err<T: Serialize + DeserializeOwned + Debug + Clone>(

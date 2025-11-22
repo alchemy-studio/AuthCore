@@ -2290,7 +2290,7 @@ async fn raw_create_hty_resource(
                     let hty_id = token.hty_id.clone()
                         .ok_or_else(|| anyhow::anyhow!("hty_id is required"))?;
                     match HtyUser::find_by_hty_id(
-                        &hty_id[..],
+                        &hty_id,
                         extract_conn(fetch_db_conn(&db_pool)?).deref_mut(),
                     ) {
                         Ok(user) => {
@@ -5180,7 +5180,7 @@ async fn raw_find_user_with_info_by_token(
         .ok_or_else(|| anyhow::anyhow!("hty_id is required in token"))?;
     
     let in_user = HtyUser::find_by_hty_id(
-        &hty_id[..],
+        &hty_id,
         extract_conn(fetch_db_conn(&db_pool)?).deref_mut(),
     )?;
 
