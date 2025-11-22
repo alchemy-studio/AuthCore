@@ -74,9 +74,9 @@ pub fn my_assert_not_none<T: Eq + Debug>(val: &Option<T>) -> Result<(), HtyErr> 
 }
 
 
-pub fn get_test_app_domain() -> u16 {
+pub fn get_test_app_domain() -> anyhow::Result<u16> {
     env::var("TEST_APP_DOMAIN")
         .expect("TEST_APP_DOMAIN not set!!!")
         .parse()
-        .unwrap()
+        .map_err(|e| anyhow::anyhow!("Failed to parse TEST_APP_DOMAIN: {}", e))
 }

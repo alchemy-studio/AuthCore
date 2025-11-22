@@ -53,8 +53,10 @@ pub fn pass_or_panic2<T>(res: anyhow::Result<T>) {
     }
 }
 
-pub fn n_hour_later(now: &NaiveDateTime, n: i64) -> NaiveDateTime {
-    *now + chrono::Duration::try_hours(n).unwrap()
+pub fn n_hour_later(now: &NaiveDateTime, n: i64) -> anyhow::Result<NaiveDateTime> {
+    chrono::Duration::try_hours(n)
+        .map(|duration| *now + duration)
+        .ok_or_else(|| anyhow::anyhow!("Invalid number of hours: {}", n))
 }
 
 pub fn remove_quote(str: &String) -> String {

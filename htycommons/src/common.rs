@@ -115,7 +115,8 @@ pub fn parse_date_time(date_time: &String) -> anyhow::Result<NaiveDateTime> {
 }
 
 pub fn parse_bool(bool_val: &String) -> anyhow::Result<bool> {
-    Ok(bool_val.trim().parse().unwrap())
+    bool_val.trim().parse()
+        .map_err(|e| anyhow::anyhow!("Failed to parse bool: {}", e))
 }
 
 pub fn get_some_from_query_params<T: FromStr + Default>(
@@ -159,8 +160,8 @@ pub fn strip_result_vec<T>(in_vec: Vec<anyhow::Result<T>>) -> anyhow::Result<Vec
     Ok(out_vec)
 }
 
-pub fn extract_filename_from_url(url: &String) -> String {
-    url.split("/").last().unwrap().to_string()
+pub fn extract_filename_from_url(url: &String) -> Option<String> {
+    url.split("/").last().filter(|s| !s.is_empty()).map(|s| s.to_string())
 }
 
 pub fn date_to_string(date: &NaiveDateTime) -> String {
@@ -168,26 +169,26 @@ pub fn date_to_string(date: &NaiveDateTime) -> String {
 }
 
 pub fn string_to_datetime(datetime: &Option<String>) -> anyhow::Result<Option<NaiveDateTime>> {
-    if datetime.is_none() {
-        return Ok(None);
-    } else {
+    if let Some(dt) = datetime {
         Ok(Some(NaiveDateTime::parse_from_str(
-            datetime.as_ref().unwrap().as_str(),
+            dt.as_str(),
             "%Y-%m-%d %H:%M:%S",
         )?))
+    } else {
+        Ok(None)
     }
 }
 
 pub fn string_to_date(date: &Option<String>) -> anyhow::Result<Option<NaiveDateTime>> {
     debug!("string_to_date -> {:?}", date);
 
-    if date.is_none() {
-        return Ok(None);
-    } else {
+    if let Some(d) = date {
         Ok(Some(
-            NaiveDate::parse_from_str(date.as_ref().unwrap().as_str(), "%Y-%m-%d")?
+            NaiveDate::parse_from_str(d.as_str(), "%Y-%m-%d")?
                 .and_time(NaiveTime::from_str("00:00:00")?),
         ))
+    } else {
+        Ok(None)
     }
 }
 

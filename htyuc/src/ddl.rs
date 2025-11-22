@@ -15,20 +15,20 @@ pub fn uc_ddl() {
 
     // let conn = &mut uc_pool.get().unwrap();
 
-    let root_app = insert_root_app(&mut uc_pool.get().unwrap());
-    let root_tag = insert_root_tag(&mut uc_pool.get().unwrap());
-    let root_role_id = insert_root_role(&mut uc_pool.get().unwrap());
+    let root_app = insert_root_app(&mut uc_pool.get().expect("Failed to get database connection"));
+    let root_tag = insert_root_tag(&mut uc_pool.get().expect("Failed to get database connection"));
+    let root_role_id = insert_root_role(&mut uc_pool.get().expect("Failed to get database connection"));
 
-    insert_root_label(&mut uc_pool.get().unwrap(), &root_role_id.clone());
-    insert_root_user(&root_app.app_id, &root_role_id.clone(), &mut uc_pool.get().unwrap());
+    insert_root_label(&mut uc_pool.get().expect("Failed to get database connection"), &root_role_id.clone());
+    insert_root_user(&root_app.app_id, &root_role_id.clone(), &mut uc_pool.get().expect("Failed to get database connection"));
 
-    let ts_app = insert_ts_app(&mut uc_pool.get().unwrap(), &root_tag.tag_id);
-    insert_ts_user(&ts_app.app_id, &mut uc_pool.get().unwrap());
+    let ts_app = insert_ts_app(&mut uc_pool.get().expect("Failed to get database connection"), &root_tag.tag_id);
+    insert_ts_user(&ts_app.app_id, &mut uc_pool.get().expect("Failed to get database connection"));
 
-    let admin_app = insert_admin_app(&mut uc_pool.get().unwrap());
-    let admin_role_id = insert_admin_role(&mut uc_pool.get().unwrap());
-    insert_admin_label(&mut uc_pool.get().unwrap(), &admin_role_id.clone());
-    insert_admin_user(&admin_app.app_id, &admin_role_id.clone(), &mut uc_pool.get().unwrap());
+    let admin_app = insert_admin_app(&mut uc_pool.get().expect("Failed to get database connection"));
+    let admin_role_id = insert_admin_role(&mut uc_pool.get().expect("Failed to get database connection"));
+    insert_admin_label(&mut uc_pool.get().expect("Failed to get database connection"), &admin_role_id.clone());
+    insert_admin_user(&admin_app.app_id, &admin_role_id.clone(), &mut uc_pool.get().expect("Failed to get database connection"));
 
 }
 
@@ -56,7 +56,8 @@ pub fn insert_root_role(conn: &mut PgConnection) -> String {
         role_name: None,
     };
 
-    let _root_role = HtyRole::create(&role_root, conn).unwrap();
+    let _root_role = HtyRole::create(&role_root, conn)
+        .expect("Failed to create root role");
 
     _root_role.hty_role_id
 }
@@ -73,7 +74,8 @@ pub fn insert_admin_role(conn: &mut PgConnection) -> String {
         role_name: None,
     };
 
-    let _role_admin_c = HtyRole::create(&role_admin, conn).unwrap();
+    let _role_admin_c = HtyRole::create(&role_admin, conn)
+        .expect("Failed to create admin role");
 
     _role_admin_c.hty_role_id
 }
@@ -91,7 +93,8 @@ pub fn insert_tester_role(app_id: &String, conn: &mut PgConnection) -> String {
         role_name: None,
     };
 
-    let created_role_tester = HtyRole::create(&role_tester, conn).unwrap();
+    let created_role_tester = HtyRole::create(&role_tester, conn)
+        .expect("Failed to create tester role");
 
 
     let tester_app_role = AppRole {
@@ -174,17 +177,24 @@ pub fn insert_tester_label(conn: &mut PgConnection, role_id: &String) {
 
 pub fn insert_ts_app(conn: &mut PgConnection, tag_id: &String) -> HtyApp {
     info!("insert task server app...");
-    let app_key_pair = generate_cert_key_pair().unwrap();
+    let app_key_pair = generate_cert_key_pair()
+        .expect("Failed to generate cert key pair");
 
     let app_id = uuid();
+    let pubkey = app_key_pair.pubkey
+        .ok_or_else(|| anyhow::anyhow!("pubkey is missing"))
+        .expect("pubkey is required");
+    let privkey = app_key_pair.privkey
+        .ok_or_else(|| anyhow::anyhow!("privkey is missing"))
+        .expect("privkey is required");
     let ts_app = HtyApp {
         app_id: app_id.clone(),
         wx_secret: Some("".to_string()),
         domain: env_var("TS_DOMAIN"),
         app_desc: Some("task server app".to_string()),
         app_status: APP_STATUS_ACTIVE.to_string(),
-        pubkey: Some(app_key_pair.pubkey.unwrap()),
-        privkey: Some(app_key_pair.privkey.unwrap()),
+        pubkey: Some(pubkey),
+        privkey: Some(privkey),
         wx_id: None,
         is_wx_app: Some(false),
     };
@@ -317,10 +327,14 @@ pub fn insert_root_user(app_id: &String, role_id: &String, conn: &mut PgConnecti
     };
 
     debug!("insert root user app_id -> {}", app_id.clone());
-    debug!("insert root user info -> app_id: {}, hty_id: {}", root_user_info.app_id.as_ref().unwrap().clone(), root_id.clone());
+    let app_id_str = root_user_info.app_id.as_ref()
+        .map(|id| id.clone())
+        .unwrap_or_else(|| "unknown".to_string());
+    debug!("insert root user info -> app_id: {}, hty_id: {}", app_id_str, root_id.clone());
 
     pass_or_panic2(HtyUser::create_with_info(&root_user, &Some(root_user_info), conn));
-    let user_info = UserAppInfo::find_by_hty_id_and_app_id(&root_id, &app_id, conn).unwrap();
+    let user_info = UserAppInfo::find_by_hty_id_and_app_id(&root_id, &app_id, conn)
+        .expect("Failed to find user info");
     let user_info_role = UserInfoRole {
         the_id: uuid(),
         user_info_id: user_info.id.clone(),
@@ -487,12 +501,13 @@ pub fn insert_music_room_teacher(app_id: &String, role_id: Option<&String>, conn
     info!("creating teacher moicen for music room...");
     pass_or_panic2(HtyUser::create_with_info(&teacher, &Some(teacher_app_info), conn));
 
-    if role_id.is_some() {
-        let user_info = UserAppInfo::find_by_hty_id_and_app_id(&teacher.hty_id.clone(), &app_id, conn).unwrap();
+    if let Some(role_id_val) = role_id {
+        let user_info = UserAppInfo::find_by_hty_id_and_app_id(&teacher.hty_id.clone(), &app_id, conn)
+            .expect("Failed to find user info");
         let user_info_role = UserInfoRole {
             the_id: uuid(),
             user_info_id: user_info.id.clone(),
-            role_id: role_id.unwrap().clone(),
+            role_id: role_id_val.clone(),
         };
         UserInfoRole::create(&user_info_role, conn).ok();
     }

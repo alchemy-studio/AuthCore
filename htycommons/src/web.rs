@@ -126,10 +126,18 @@ where
             let resp = wrap_auth_err(&None);
             Err((StatusCode::UNAUTHORIZED, resp))
         } else {
-            match jwt_decode_token(&token_result.unwrap().to_string()) {
-                Ok(resp) => Ok(resp),
-                Err(err) => {
-                    let resp = wrap_auth_err(&Some(err.to_string()));
+            match token_result {
+                Ok(token_str) => {
+                    match jwt_decode_token(&token_str.to_string()) {
+                        Ok(resp) => Ok(resp),
+                        Err(err) => {
+                            let resp = wrap_auth_err(&Some(err.to_string()));
+                            Err((StatusCode::UNAUTHORIZED, resp))
+                        }
+                    }
+                }
+                Err(_) => {
+                    let resp = wrap_auth_err(&None);
                     Err((StatusCode::UNAUTHORIZED, resp))
                 }
             }
@@ -267,7 +275,7 @@ pub fn wrap_auth_err(some_err_str: &Option<String>) -> String {
             reason: None,
         }),
     })
-    .unwrap()
+    .unwrap_or_else(|_| "{\"r\":false,\"d\":null,\"e\":\"AuthorizationErr\",\"hty_err\":{\"code\":\"InternalErr\",\"reason\":null}}".to_string())
 }
 
 pub fn wrap_sudo_err(some_token: &Option<String>) -> String {
@@ -280,7 +288,7 @@ pub fn wrap_sudo_err(some_token: &Option<String>) -> String {
             reason: Some("HtySudoerTokenErr".to_string()),
         }),
     })
-    .unwrap()
+    .unwrap_or_else(|_| "{\"r\":false,\"d\":null,\"e\":\"HtySudoerTokenErr\",\"hty_err\":{\"code\":\"AuthenticationFailed\",\"reason\":\"HtySudoerTokenErr\"}}".to_string())
 }
 
 pub fn wrap_anyhow_err<T: Serialize + DeserializeOwned + Debug + Clone>(
@@ -314,16 +322,18 @@ pub fn wrap_ok_resp<T: Serialize + DeserializeOwned + Debug + Clone>(ok: T) -> H
 
 //------------------------------------------------
 
-pub async fn launch_rocket(port: u16, app: Router) {
+pub async fn launch_rocket(port: u16, app: Router) -> anyhow::Result<()> {
     debug!("launching rocket...🚀");
     let addr = SocketAddr::from(([127, 0, 0, 1], port));
     // tracing::debug!("listening on {}", addr);
     debug!("listening on {}", addr);
     // https://tokio.rs/blog/2023-11-27-announcing-axum-0-7-0
-    let listener = TcpListener::bind(&addr).await.unwrap();
+    let listener = TcpListener::bind(&addr).await
+        .map_err(|e| anyhow!("Failed to bind to address: {}", e))?;
     axum::serve(listener, app.into_make_service())
         .await
-        .unwrap();
+        .map_err(|e| anyhow!("Failed to start server: {}", e))?;
+    Ok(())
 }
 
 
@@ -357,11 +367,11 @@ pub fn random_port() -> u16 {
     rand::rng().random_range(10000..20000)
 }
 
-pub fn get_uc_port() -> u16 {
+pub fn get_uc_port() -> anyhow::Result<u16> {
     env::var("UC_PORT")
         .expect("UC_PORT not set!!!")
         .parse()
-        .unwrap()
+        .map_err(|e| anyhow::anyhow!("Failed to parse UC_PORT: {}", e))
 }
 
 pub fn generate_ports() {
@@ -381,53 +391,52 @@ pub fn set_uc_port(port: u16) {
     env::set_var("UC_PORT", port.to_string());
 }
 
-pub fn get_ws_port() -> u16 {
+pub fn get_ws_port() -> anyhow::Result<u16> {
     env::var("WS_PORT")
         .expect("WS_PORT not set!!!")
         .parse()
-        .unwrap()
+        .map_err(|e| anyhow::anyhow!("Failed to parse WS_PORT: {}", e))
 }
 
 pub fn set_ws_port(port: u16) {
     env::set_var("WS_PORT", port.to_string());
 }
-pub fn get_kc_port() -> u16 {
+pub fn get_kc_port() -> anyhow::Result<u16> {
     env::var("KC_PORT")
         .expect("KC_PORT not set!!!")
         .parse()
-        .unwrap()
+        .map_err(|e| anyhow::anyhow!("Failed to parse KC_PORT: {}", e))
 }
 
 pub fn set_kc_port(port: u16) {
     env::set_var("KC_PORT", port.to_string());
 }
 
-pub fn skip_post_login() -> bool {
+pub fn skip_post_login() -> anyhow::Result<bool> {
     env::var("SKIP_POST_LOGIN")
         .expect("SKIP_POST_LOGIN not set!!!")
         .parse()
-        .unwrap()
+        .map_err(|e| anyhow::anyhow!("Failed to parse SKIP_POST_LOGIN: {}", e))
 }
 
-pub fn skip_post_registration() -> bool {
+pub fn skip_post_registration() -> anyhow::Result<bool> {
     env::var("SKIP_REGISTRATION")
         .expect("SKIP_REGISTRATION not set!!!")
         .parse()
-        .unwrap()
+        .map_err(|e| anyhow::anyhow!("Failed to parse SKIP_REGISTRATION: {}", e))
 }
 
-pub fn skip_wx_push() -> bool {
+pub fn skip_wx_push() -> anyhow::Result<bool> {
     env::var("SKIP_WX_PUSH")
         .expect("SKIP_WX_PUSH not set!!!")
         .parse()
-        .unwrap()
+        .map_err(|e| anyhow::anyhow!("Failed to parse SKIP_WX_PUSH: {}", e))
 }
 
 pub fn get_domain() -> String {
     env::var("DOMAIN")
         .expect("DOMAIN not set!!!")
-        .parse()
-        .unwrap()
+        .to_string()
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

@@ -17,11 +17,11 @@ pub const OPENID_INFO: &str = "OPENID_INFO_";
 pub const CACHED: &str = "C_";
 
 
-pub fn get_token_expiration_days() -> usize {
+pub fn get_token_expiration_days() -> anyhow::Result<usize> {
     env::var("EXPIRATION_DAYS")
         .expect("EXPIRATION_DAYS not set!!!")
         .parse()
-        .unwrap()
+        .map_err(|e| anyhow::anyhow!("Failed to parse EXPIRATION_DAYS: {}", e))
 }
 
 pub fn get_redis_url() -> anyhow::Result<String> {
@@ -50,7 +50,7 @@ pub fn save_token_with_exp_days(token: &HtyToken, expiration_day: usize) -> anyh
     prefix_key.push_str(token.clone().token_id.as_str());
 
     save_kv_to_redis_with_exp_days(&prefix_key,
-                                   &jwt_encode_token(token.clone()).unwrap(),
+                                   &jwt_encode_token(token.clone())?,
                                    expiration_day)
 }
 
@@ -79,7 +79,7 @@ pub fn save_kv_to_redis(key: &String, value: &String) -> anyhow::Result<()> {
 
     let mut prefix_key = HTY_REDIS_KEY_PREFIX.to_string();
     prefix_key.push_str(key);
-    let redis_url = get_redis_url().unwrap();
+    let redis_url = get_redis_url()?;
 
     match Client::open(redis_url.clone()) {
         Ok(cli) => match cli.get_connection() {
@@ -113,7 +113,7 @@ pub fn save_kv_to_redis_with_exp_secs(key: &String, value: &String, expiration_s
 
     let mut prefix_key = HTY_REDIS_KEY_PREFIX.to_string();
     prefix_key.push_str(key);
-    let redis_url = get_redis_url().unwrap();
+    let redis_url = get_redis_url()?;
 
     match Client::open(redis_url.clone()) {
         Ok(cli) => match cli.get_connection() {
@@ -153,7 +153,7 @@ pub fn get_value_from_redis(key: &String) -> anyhow::Result<String> {
     let mut prefix_key = HTY_REDIS_KEY_PREFIX.to_string();
     prefix_key.push_str(key);
     debug!("get_value_from_redis() -> key / {:?}", &prefix_key);
-    let redis_url = get_redis_url().unwrap();
+    let redis_url = get_redis_url()?;
     let mut redis_conn = Client::open(redis_url.clone())?.get_connection()?;
     let value = redis_conn.get(prefix_key)?;
     debug!("get_value_from_redis() -> token : {:?}", value);
@@ -164,7 +164,7 @@ pub fn get_opt_value_from_redis(key: &String) -> anyhow::Result<Option<String>> 
     let mut prefix_key = HTY_REDIS_KEY_PREFIX.to_string();
     prefix_key.push_str(key);
     debug!("get_value_from_redis2() -> key / {:?}", &prefix_key);
-    let redis_url = get_redis_url().unwrap();
+    let redis_url = get_redis_url()?;
     let mut redis_conn = Client::open(redis_url.clone())?.get_connection()?;
     let value = redis_conn.get(prefix_key)?;
     debug!("get_value_from_redis2() -> token : {:?}", value);
@@ -172,7 +172,7 @@ pub fn get_opt_value_from_redis(key: &String) -> anyhow::Result<Option<String>> 
 }
 
 pub fn is_key_exist_in_redis(key: &String) -> anyhow::Result<bool> {
-    let redis_url = get_redis_url().unwrap();
+    let redis_url = get_redis_url()?;
 
     let mut prefix_key = HTY_REDIS_KEY_PREFIX.to_string();
     prefix_key.push_str(key);
@@ -187,7 +187,7 @@ pub fn is_key_exist_in_redis(key: &String) -> anyhow::Result<bool> {
 pub fn verify_jwt(jwt_token: &String) -> anyhow::Result<()> {
     dotenv().ok();
     //Save token to redis
-    let redis_url = get_redis_url().unwrap();
+    let redis_url = get_redis_url()?;
     debug!("verify_jwt -> redis_url / {:?}", redis_url.clone());
     debug!("verify_jwt -> jwt_token to verify: {:?}", jwt_token.clone());
 
@@ -227,7 +227,7 @@ pub fn del_from_redis(key: &String) -> anyhow::Result<String> {
     let mut prefix_key = HTY_REDIS_KEY_PREFIX.to_string();
     prefix_key.push_str(key);
 
-    let redis_url = get_redis_url().unwrap();
+    let redis_url = get_redis_url()?;
 
     let mut redis_conn = Client::open(redis_url.clone())?.get_connection()?;
 

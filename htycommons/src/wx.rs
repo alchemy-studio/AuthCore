@@ -69,10 +69,11 @@ pub struct WxLogin {
 }
 
 pub async fn code2session(params: &WxParams) -> anyhow::Result<WxSession> {
+    let appid = params.appid.clone().ok_or_else(|| anyhow::anyhow!("appid is required"))?;
+    let secret = params.secret.clone().ok_or_else(|| anyhow::anyhow!("secret is required"))?;
+    let code = params.code.clone().ok_or_else(|| anyhow::anyhow!("code is required"))?;
     let url = format!("https://api.weixin.qq.com/sns/jscode2session?appid={0}&secret={1}&js_code={2}&grant_type=authorization_code",
-                      params.appid.clone().unwrap(),
-                      params.secret.clone().unwrap(),
-                      params.code.clone().unwrap());
+                      appid, secret, code);
 
     debug!("code2session -> url -> {}", url);
 
@@ -85,20 +86,25 @@ pub async fn code2session(params: &WxParams) -> anyhow::Result<WxSession> {
     Ok(ret)
 }
 
-pub fn wx_decode(params: &WxParams, session_key: &str) -> String {
+pub fn wx_decode(params: &WxParams, session_key: &str) -> anyhow::Result<String> {
     use aes::cipher::{
         block_padding::Pkcs7, generic_array::GenericArray, BlockDecryptMut, KeyIvInit,
     };
     use cbc::Decryptor;
     type Aes128CbcDec = Decryptor<aes::Aes128>;
 
-    let decoded_session_key = BASE64_DECODER.decode(session_key).unwrap();
-    let decoded_iv = BASE64_DECODER.decode(params.iv.clone().unwrap()).unwrap();
+    let decoded_session_key = BASE64_DECODER.decode(session_key)
+        .map_err(|e| anyhow::anyhow!("Failed to decode session_key: {}", e))?;
+    let iv = params.iv.clone().ok_or_else(|| anyhow::anyhow!("iv is required"))?;
+    let decoded_iv = BASE64_DECODER.decode(iv)
+        .map_err(|e| anyhow::anyhow!("Failed to decode iv: {}", e))?;
 
     let key = GenericArray::clone_from_slice(decoded_session_key.as_slice());
     let iv = GenericArray::clone_from_slice(decoded_iv.as_slice());
 
-    let decoded_encrypted_data = BASE64_DECODER.decode(params.encrypted_data.clone().unwrap()).unwrap();
+    let encrypted_data = params.encrypted_data.clone().ok_or_else(|| anyhow::anyhow!("encrypted_data is required"))?;
+    let decoded_encrypted_data = BASE64_DECODER.decode(encrypted_data)
+        .map_err(|e| anyhow::anyhow!("Failed to decode encrypted_data: {}", e))?;
 
     let ct_len = decoded_encrypted_data.len();
     let mut buf = vec![0u8; ct_len];
@@ -108,9 +114,11 @@ pub fn wx_decode(params: &WxParams, session_key: &str) -> String {
 
     let pt = Aes128CbcDec::new(&key, &iv)
         .decrypt_padded_mut::<Pkcs7>(&mut buf)
-        .unwrap();
+        .map_err(|e| anyhow::anyhow!("Failed to decrypt data: {}", e))?;
 
-    std::str::from_utf8(&pt).unwrap().into()
+    std::str::from_utf8(&pt)
+        .map_err(|e| anyhow::anyhow!("Failed to convert to UTF-8: {}", e))
+        .map(|s| s.to_string())
 }
 
 

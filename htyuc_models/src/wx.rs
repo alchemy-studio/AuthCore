@@ -423,7 +423,7 @@ pub async fn fn_push_wx_message<T: Send + Clone + Serialize + Debug>(
 pub async fn push_wx_message<T: Serialize + Clone + Send + Debug>(to_app: &HtyApp, wx_push_message: &ReqWxPushMessage<T>) -> anyhow::Result<()> {
     debug!("push_wx_message START -> to_app: {:?} / wx_push_message: {:?}", to_app, wx_push_message);
 
-    if skip_wx_push() {
+    if skip_wx_push().unwrap_or(false) {
         debug!("push_wx_message() ::BYPASSED::");
         Ok(())
     } else {
@@ -494,7 +494,7 @@ pub async fn push_wx_message2<T: Serialize + Clone + Send + Debug>(to_app: &HtyA
 
     debug!("push_wx_message2 -> {:?}", wx_push_message);
 
-    if skip_wx_push() {
+    if skip_wx_push().unwrap_or(false) {
         debug!("push_wx_message2() ::BYPASSED::");
         Ok(())
     } else {

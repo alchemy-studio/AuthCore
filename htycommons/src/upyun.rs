@@ -72,7 +72,8 @@ pub async fn upyun_delete_by_filename(in_filename: &String, sudoer: &String, hos
     let url = format!("{}/image/upyun_remove", get_ngx_url());
     debug!("upyun_delete_by_filename -> url: {}", url);
 
-    let body = serde_json::to_string::<UpyunFilename>(&upyun_filename).unwrap();
+    let body = serde_json::to_string::<UpyunFilename>(&upyun_filename)
+        .map_err(|e| anyhow::anyhow!("Failed to serialize upyun_filename: {}", e))?;
     debug!("upyun_delete_by_filename -> body: {}", body);
 
 

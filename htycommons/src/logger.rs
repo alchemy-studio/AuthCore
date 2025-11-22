@@ -64,7 +64,7 @@ pub fn logger_init() -> () {
     // let timer = UtcTime::new(time::format_description::well_known::Rfc3339);
     // https://rustcc.cn/article?id=66e2a76e-8c65-42f7-a773-66dff1a2a21e
     let local_time = OffsetTime::new(
-        UtcOffset::from_hms(8, 0, 0).unwrap(),
+        UtcOffset::from_hms(8, 0, 0).unwrap_or_else(|_| UtcOffset::from_hms(0, 0, 0).expect("Failed to create UTC offset")),
         format_description!("[year]-[month]-[day] [hour]:[minute]:[second].[subsecond digits:3]"),
     );
 

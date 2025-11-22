@@ -99,26 +99,28 @@ async fn save_cached_kv(_sudoer: HtySudoerTokenHeader,
 
 fn raw_save_cached_kv(in_kv: &ReqKV) -> anyhow::Result<()> {
     let c_in_kv = in_kv.clone();
+    let key = c_in_kv.key.ok_or_else(|| anyhow::anyhow!("key is required"))?;
+    let val = c_in_kv.val.ok_or_else(|| anyhow::anyhow!("val is required"))?;
     let mut prefix_key = CACHED.to_string();
-    prefix_key.push_str(c_in_kv.key.unwrap().clone().as_str());
+    prefix_key.push_str(key.as_str());
 
-    if in_kv.exp_unit.is_some() {
-        match in_kv.exp_unit.clone().unwrap() {
+    if let Some(exp_unit) = in_kv.exp_unit.clone() {
+        match exp_unit {
             TimeUnit::SECOND => {
-                save_kv_to_redis_with_exp_secs(&prefix_key, &c_in_kv.val.unwrap(), c_in_kv.exp.unwrap_or(7) as usize) // default 7 seconds.
+                save_kv_to_redis_with_exp_secs(&prefix_key, &val, c_in_kv.exp.unwrap_or(7) as usize) // default 7 seconds.
             }
             TimeUnit::MINUTE => {
-                save_kv_to_redis_with_exp_minutes(&prefix_key, &c_in_kv.val.unwrap(), c_in_kv.exp.unwrap_or(7) as usize) // default 7 minutes.
+                save_kv_to_redis_with_exp_minutes(&prefix_key, &val, c_in_kv.exp.unwrap_or(7) as usize) // default 7 minutes.
             }
             TimeUnit::HOUR => {
-                save_kv_to_redis_with_exp_hours(&prefix_key, &c_in_kv.val.unwrap(), c_in_kv.exp.unwrap_or(7) as usize) // default 7 hours.
+                save_kv_to_redis_with_exp_hours(&prefix_key, &val, c_in_kv.exp.unwrap_or(7) as usize) // default 7 hours.
             }
             TimeUnit::DAY => {
-                save_kv_to_redis_with_exp_days(&prefix_key, &c_in_kv.val.unwrap(), c_in_kv.exp.unwrap_or(7) as usize) // default 7 days.
+                save_kv_to_redis_with_exp_days(&prefix_key, &val, c_in_kv.exp.unwrap_or(7) as usize) // default 7 days.
             }
         }
     } else {
-        save_kv_to_redis_with_exp_days(&prefix_key, &c_in_kv.val.unwrap(), c_in_kv.exp.unwrap_or(7) as usize) // default 7 days.
+        save_kv_to_redis_with_exp_days(&prefix_key, &val, c_in_kv.exp.unwrap_or(7) as usize) // default 7 days.
     }
 }
 
@@ -179,16 +181,28 @@ async fn find_hty_template_with_data_by_key_and_app_id(
     let id_app = get_some_from_query_params::<String>("app_id", &params);
     let key_template = get_some_from_query_params::<String>("template_key", &params);
 
-    if id_app.is_none() || key_template.is_none() {
-        return wrap_json_hty_err::<ReqHtyTemplate<String>>(HtyErr {
-            code: HtyErrCode::WebErr,
-            reason: Some("id_app or key_template is none".into()),
-        });
-    }
+    let id_app_val = match id_app {
+        Some(val) => val,
+        None => {
+            return wrap_json_hty_err::<ReqHtyTemplate<String>>(HtyErr {
+                code: HtyErrCode::WebErr,
+                reason: Some("id_app is required".into()),
+            });
+        }
+    };
+    let key_template_val = match key_template {
+        Some(val) => val,
+        None => {
+            return wrap_json_hty_err::<ReqHtyTemplate<String>>(HtyErr {
+                code: HtyErrCode::WebErr,
+                reason: Some("key_template is required".into()),
+            });
+        }
+    };
 
     match raw_find_hty_template_with_data_by_key_and_app_id(
-        &id_app.unwrap(),
-        &key_template.unwrap(),
+        &id_app_val,
+        &key_template_val,
         extract_conn(conn).deref_mut(),
     ) {
         Ok(resp) => {
@@ -816,20 +830,24 @@ fn raw_bulk_update_tag_ref(
     req_tag_refs_by_ref_id: ReqTagRefsByRefId,
     db_pool: Arc<DbState>,
 ) -> anyhow::Result<ReqTagRefsByRefId> {
-    let ref_id = req_tag_refs_by_ref_id.ref_id.clone().unwrap();
+    let ref_id = req_tag_refs_by_ref_id.ref_id.clone()
+        .ok_or_else(|| anyhow::anyhow!("ref_id is required"))?;
     let cloned_req_tag_refs = req_tag_refs_by_ref_id.tag_refs.clone().unwrap_or(Vec::new());
 
     // 将数据序列化传递给闭包
     let mut params = HashMap::new();
-    params.insert("ref_id".to_string(), ref_id);
+    params.insert("ref_id".to_string(), ref_id.clone());
     params.insert("tag_refs".to_string(), serde_json::to_string(&cloned_req_tag_refs)?);
 
     let task_update = |in_params: Option<HashMap<String, String>>,
                       conn: &mut PgConnection|
                       -> anyhow::Result<Vec<ReqHtyTagRef>> {
-        let params = in_params.unwrap();
-        let ref_id = params.get("ref_id").unwrap().clone();
-        let tag_refs_json = params.get("tag_refs").unwrap();
+        let params = in_params.ok_or_else(|| anyhow::anyhow!("params is required"))?;
+        let ref_id = params.get("ref_id")
+            .ok_or_else(|| anyhow::anyhow!("ref_id not found in params"))?
+            .clone();
+        let tag_refs_json = params.get("tag_refs")
+            .ok_or_else(|| anyhow::anyhow!("tag_refs not found in params"))?;
         let cloned_req_tag_refs: Vec<ReqHtyTagRef> = serde_json::from_str(tag_refs_json)?;
 
         let _ = HtyTagRef::delete_all_by_ref_id(&ref_id, conn)?;
@@ -843,11 +861,15 @@ fn raw_bulk_update_tag_ref(
                 }));
             }
             let new_id = uuid();
+            let hty_tag_id = req_tag_ref.hty_tag_id.clone()
+                .ok_or_else(|| anyhow::anyhow!("hty_tag_id is required"))?;
+            let ref_type = req_tag_ref.ref_type.clone()
+                .ok_or_else(|| anyhow::anyhow!("ref_type is required"))?;
             let db_tag_ref = HtyTagRef {
                 the_id: new_id.clone(),
-                hty_tag_id: req_tag_ref.hty_tag_id.clone().unwrap(),
+                hty_tag_id,
                 ref_id: ref_id.clone(),
-                ref_type: req_tag_ref.ref_type.clone().unwrap(),
+                ref_type,
                 meta: req_tag_ref.meta.clone(),
             };
             let _ = HtyTagRef::create(&db_tag_ref, conn)?;
@@ -1774,7 +1796,7 @@ async fn raw_register(
 }
 
 fn do_post_registration(to_app_id: &String, user_id: &String) {
-    if skip_post_registration() {
+    if skip_post_registration().unwrap_or(false) {
         debug!("do_post_registration ::BY_PASSED::");
     } else {
         let to_app_id_copy = to_app_id.clone();
@@ -2767,7 +2789,8 @@ async fn raw_delete_hty_resource_by_id(id_hty_resource: String, sudoer: HtySudoe
 
     debug!("raw_delete_hty_resource_by_id -> hty_resource: {:?}", hty_resource);
     // if hty_resource.url.is_some() {
-    let filename = extract_filename_from_url(&hty_resource.url);
+    let filename = extract_filename_from_url(&hty_resource.url)
+        .ok_or_else(|| anyhow::anyhow!("Failed to extract filename from URL: {}", hty_resource.url))?;
     debug!("raw_delete_hty_resource_by_id -> filename: {:?}", filename);
     let _ = upyun_delete_by_filename(&filename, &sudoer.0, &host.0).await?;
     // }
@@ -5063,7 +5086,7 @@ fn raw_sudo2(auth: AuthorizationHeader, host: HtyHostHeader, to_user_id: String,
             roles: user_app_info.req_roles_by_id(conn)?,
             tags: None,
         };
-        save_token_with_exp_days(&resp_token, get_token_expiration_days())?;
+        save_token_with_exp_days(&resp_token, get_token_expiration_days()?)?;
         Ok(jwt_encode_token(resp_token)?)
     } else {
         return Err(anyhow!(HtyErr {
@@ -5118,7 +5141,7 @@ fn raw_sudo(auth: AuthorizationHeader, conn: &mut PgConnection) -> anyhow::Resul
             };
 
             //Save sudoer token
-            save_token_with_exp_days(&resp_token, get_token_expiration_days())?;
+            save_token_with_exp_days(&resp_token, get_token_expiration_days()?)?;
 
             Ok(jwt_encode_token(resp_token)?)
         }
@@ -5195,7 +5218,7 @@ fn raw_login_with_password(
     };
 
     return if info.password == req_login.password {
-        save_token_with_exp_days(&resp_token, get_token_expiration_days())?;
+        save_token_with_exp_days(&resp_token, get_token_expiration_days()?)?;
 
         Ok(jwt_encode_token(resp_token)?)
     } else {
@@ -5288,7 +5311,7 @@ async fn raw_wx_qr_login(code: String, app_domain: String, db_pool: Arc<DbState>
 
     debug!("raw_wx_qr_login -> resp_token: {:?}", &resp_token);
 
-    save_token_with_exp_days(&resp_token, get_token_expiration_days())?;
+    save_token_with_exp_days(&resp_token, get_token_expiration_days()?)?;
     Ok(jwt_encode_token(resp_token)?)
 }
 
@@ -5510,7 +5533,7 @@ fn raw_login2_with_unionid_tx(
                     },
                 };
 
-                save_token_with_exp_days(&token, get_token_expiration_days())?;
+                save_token_with_exp_days(&token, get_token_expiration_days()?)?;
                 debug!("entering post_login()");
 
                 // 注册流程完成
@@ -5562,7 +5585,7 @@ pub async fn post_login(
     from_app: &HtyApp,
     conn: &mut PgConnection,
 ) -> anyhow::Result<()> {
-    if skip_post_login() {
+    if skip_post_login().unwrap_or(false) {
         debug!("post_login() ::BYPASSED::");
     } else {
         debug!("post_login() starts");
@@ -6026,7 +6049,7 @@ fn raw_login_with_cert(
                 tags: None,
             };
 
-            save_token_with_exp_days(&resp_token, get_token_expiration_days())?;
+            save_token_with_exp_days(&resp_token, get_token_expiration_days()?)?;
             Ok(jwt_encode_token(resp_token)?)
         }
         Err(error) => Err(error),

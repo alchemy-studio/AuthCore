@@ -7,6 +7,7 @@ use crate::uc_rocket;
 pub async fn main() {
     dotenv().ok();
 
-    let rocket = launch_rocket(get_uc_port(), uc_rocket(&get_uc_db_url()));
-    rocket.await;
+    let port = get_uc_port().expect("Failed to get UC_PORT");
+    let rocket = launch_rocket(port, uc_rocket(&get_uc_db_url()));
+    rocket.await.expect("Failed to launch rocket");
 }
