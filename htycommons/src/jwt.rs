@@ -21,9 +21,18 @@ pub fn jwt_key() -> String {
 }
 
 pub fn jwt_encode_token(token: HtyToken) -> Result<String, HtyErr> {
-    let t = n_hour_later(&current_local_datetime(), 10000).and_utc().timestamp() as usize;
+    let t = n_hour_later(&current_local_datetime(), 10000)
+        .map_err(|e| HtyErr {
+            code: HtyErrCode::JwtErr,
+            reason: Some(format!("Failed to calculate expiration time: {}", e)),
+        })?
+        .and_utc().timestamp() as usize;
     let claims = HtyJwtClaims {
-        sub: serde_json::to_string(&token).unwrap(),
+        sub: serde_json::to_string(&token)
+            .map_err(|e| HtyErr {
+                code: HtyErrCode::JwtErr,
+                reason: Some(format!("Failed to serialize token: {}", e)),
+            })?,
         exp: t,
         iat: t,
     };
@@ -57,7 +66,11 @@ fn _jwt_decode_claims(token: &String, validation: &Validation) -> Result<HtyToke
         Ok(v) => {
             //debug(format!("decoded obj -> {:?}", v).as_str());
             debug!("_jwt_decode_claims -> decoded token:  {:?}", v);
-            Ok(serde_json::from_str::<HtyToken>(v.claims.sub.as_str()).unwrap())
+            serde_json::from_str::<HtyToken>(v.claims.sub.as_str())
+                .map_err(|e| HtyErr {
+                    code: HtyErrCode::JwtErr,
+                    reason: Some(format!("Failed to deserialize token: {}", e)),
+                })
         }
         Err(err) => Err(wrap_err(JwtErr, Box::from(err))),
     }

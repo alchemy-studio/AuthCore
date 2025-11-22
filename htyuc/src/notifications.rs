@@ -37,15 +37,17 @@ fn build_wx_push_message_for_teacher_register(
 
     let from_app_admin_user_infos: Vec<UserAppInfo> = admin_users
         .into_iter()
-        .filter(|the_info| the_info.app_id.clone().unwrap() == from_app.app_id)
+        .filter(|the_info| the_info.app_id.as_ref().map(|id| id == &from_app.app_id).unwrap_or(false))
         .collect();
 
     debug!("from_app_admin_users -> {:?}", &from_app_admin_user_infos);
 
     // let template_id = String::from(env::var("WX_MSG_TEACHER_REGISTER")?.to_string());
 
+    let wx_id = from_app.clone().wx_id
+        .ok_or_else(|| anyhow::anyhow!("wx_id is required for from_app"))?;
     let wx_mini_program = ReqWxMiniProgram {
-        appid: from_app.clone().wx_id.unwrap(),
+        appid: wx_id,
         pagepath: "index".to_string(),
     };
 
@@ -60,7 +62,10 @@ fn build_wx_push_message_for_teacher_register(
 
     debug!("build_wx_push_message_for_teacher_register -> {:?} / {:?}", &in_template, &in_template_data);
 
-    let mut wx_message_data = in_template_data.template_text.clone().unwrap().clone().val.unwrap();
+    let mut wx_message_data = in_template_data.template_text.clone()
+        .ok_or_else(|| anyhow::anyhow!("template_text is required"))?
+        .val
+        .ok_or_else(|| anyhow::anyhow!("template_text.val is required"))?;
 
     let val_keyword1 = wx_message_data.keyword1.value;
     let val_keyword2 = wx_message_data.keyword2.value;
@@ -84,17 +89,20 @@ fn build_wx_push_message_for_teacher_register(
     // let mut tongzhi_array = vec![];
 
     for admin_user_info in from_app_admin_user_infos {
-        let admin_user_openid = admin_user_info.openid.clone().unwrap();
+        let admin_user_openid = admin_user_info.openid.clone()
+            .ok_or_else(|| anyhow::anyhow!("admin_user openid is required"))?;
 
         let admin_user = UserAppInfo::find_hty_user_by_openid(&admin_user_openid, conn)?;
 
         let admin_user_toapp_info =
             UserAppInfo::find_by_hty_id_and_app_id(&admin_user.hty_id, &to_app.app_id, conn)?;
 
+        let template_id = in_template_data.template_val.clone()
+            .ok_or_else(|| anyhow::anyhow!("template_val is required"))?;
         let push_message = ReqWxPushMessage {
             touser: admin_user_toapp_info.openid.clone(),
             // touser_hty_id: Some(admin_user.clone().hty_id),
-            template_id: in_template_data.template_val.clone().unwrap(),
+            template_id,
             url: Some(get_music_room_mini_url()), // todo: use PARAM to load domain
             miniprogram: Some(wx_mini_program.clone()),
             data: wx_message_data.clone(),
@@ -127,8 +135,10 @@ fn build_wx_push_message_for_student_register(
 
     debug!("build_wx_push_message_for_student_register -> user_teacher -> {:?}", user_teacher);
 
+    let wx_id = from_app.clone().wx_id
+        .ok_or_else(|| anyhow::anyhow!("wx_id is required for from_app"))?;
     let wx_mini_program = ReqWxMiniProgram {
-        appid: from_app.clone().wx_id.unwrap(),
+        appid: wx_id,
         pagepath: "index".to_string(),
     };
 
@@ -143,7 +153,10 @@ fn build_wx_push_message_for_student_register(
     debug!("build_wx_push_message_for_student_register -> _in_template -> {:?}", _in_template);
     debug!("build_wx_push_message_for_student_register -> in_template_data -> {:?}", in_template_data);
 
-    let mut wx_message_data = in_template_data.template_text.clone().unwrap().clone().val.unwrap();
+    let mut wx_message_data = in_template_data.template_text.clone()
+        .ok_or_else(|| anyhow::anyhow!("template_text is required"))?
+        .val
+        .ok_or_else(|| anyhow::anyhow!("template_text.val is required"))?;
 
     debug!("build_wx_push_message_for_student_register -> BEFORE wx_message_data -> {:?}", wx_message_data);
 
@@ -162,9 +175,11 @@ fn build_wx_push_message_for_student_register(
 
     debug!("build_wx_push_message_for_student_register -> AFTER wx_message_data -> {:?}", wx_message_data);
 
+    let template_id = in_template_data.template_val.clone()
+        .ok_or_else(|| anyhow::anyhow!("template_val is required"))?;
     Ok(ReqWxPushMessage {
         touser: user_teacher.openid.clone(),
-        template_id: in_template_data.template_val.clone().unwrap(),
+        template_id,
         url: Some(get_music_room_mini_url()),
         miniprogram: Some(wx_mini_program.clone()),
         data: wx_message_data.clone(),
@@ -181,8 +196,10 @@ fn build_wx_push_message_for_student_register_success(
 ) -> anyhow::Result<ReqWxPushMessage<ReqWxMessageData2keywordTemplate>> {
     let user_student = UserAppInfo::find_by_hty_id_and_app_id(id_student, &to_app.app_id, conn)?;
 
+    let wx_id = from_app.clone().wx_id
+        .ok_or_else(|| anyhow::anyhow!("wx_id is required for from_app"))?;
     let wx_mini_program = ReqWxMiniProgram {
-        appid: from_app.clone().wx_id.unwrap(),
+        appid: wx_id,
         pagepath: "index".to_string(),
     };
 
@@ -193,7 +210,10 @@ fn build_wx_push_message_for_student_register_success(
                                                                                                &to_app.app_id.clone(),
                                                                                                conn)?;
 
-    let mut wx_message_data = in_template_data.template_text.clone().unwrap().clone().val.unwrap();
+    let mut wx_message_data = in_template_data.template_text.clone()
+        .ok_or_else(|| anyhow::anyhow!("template_text is required"))?
+        .val
+        .ok_or_else(|| anyhow::anyhow!("template_text.val is required"))?;
 
     let val_keyword1 = wx_message_data.keyword1.value;
     let val_keyword2 = wx_message_data.keyword2.value;
@@ -208,9 +228,11 @@ fn build_wx_push_message_for_student_register_success(
             .replace("DAY", current_datetime.day().to_string().as_str())
     };
 
+    let template_id = in_template_data.template_val.clone()
+        .ok_or_else(|| anyhow::anyhow!("template_val is required"))?;
     Ok(ReqWxPushMessage {
         touser: user_student.openid.clone(),
-        template_id: in_template_data.template_val.clone().unwrap(),
+        template_id,
         url: Some(get_music_room_mini_url()),
         miniprogram: Some(wx_mini_program.clone()),
         data: wx_message_data.clone(),
@@ -231,8 +253,10 @@ fn build_wx_push_message_for_teacher_register_success(
 
     // let template_id = String::from(env::var("WX_MSG_TEACHER_REGISTER_SUCCESS")?.to_string());
 
+    let wx_id = from_app.clone().wx_id
+        .ok_or_else(|| anyhow::anyhow!("wx_id is required for from_app"))?;
     let wx_mini_program = ReqWxMiniProgram {
-        appid: from_app.clone().wx_id.unwrap(),
+        appid: wx_id,
         pagepath: "index".to_string(),
     };
 
@@ -245,7 +269,10 @@ fn build_wx_push_message_for_teacher_register_success(
 
     debug!("build_wx_push_message_for_teacher_register_success -> {:?} / {:?}", &in_template, &in_template_data);
 
-    let mut wx_message_data = in_template_data.template_text.clone().unwrap().clone().val.unwrap();
+    let mut wx_message_data = in_template_data.template_text.clone()
+        .ok_or_else(|| anyhow::anyhow!("template_text is required"))?
+        .val
+        .ok_or_else(|| anyhow::anyhow!("template_text.val is required"))?;
     let val_keyword1 = wx_message_data.keyword1.value;
     let val_keyword2 = wx_message_data.keyword2.value;
 
@@ -258,9 +285,11 @@ fn build_wx_push_message_for_teacher_register_success(
     };
 
 
+    let template_id = in_template_data.template_val.clone()
+        .ok_or_else(|| anyhow::anyhow!("template_val is required"))?;
     let resp = ReqWxPushMessage {
         touser: teacher_toapp_info.openid,
-        template_id: in_template_data.template_val.clone().unwrap(),
+        template_id,
         url: Some(get_music_room_mini_url()),
         miniprogram: Some(wx_mini_program.clone()),
         data: wx_message_data.clone(),
@@ -287,8 +316,10 @@ fn build_wx_push_message_for_reject_register(
 
     // let template_id = String::from(env::var("WX_MSG_REJECT_REGISTER")?.to_string());
 
+    let wx_id = from_app.clone().wx_id
+        .ok_or_else(|| anyhow::anyhow!("wx_id is required for from_app"))?;
     let wx_mini_program = ReqWxMiniProgram {
-        appid: from_app.clone().wx_id.unwrap(),
+        appid: wx_id,
         pagepath: "index".to_string(),
     };
 
@@ -303,7 +334,10 @@ fn build_wx_push_message_for_reject_register(
 
     debug!("build_wx_push_message_for_reject_register -> {:?} / {:?}", &in_template, &in_template_data);
 
-    let mut wx_message_data = in_template_data.template_text.clone().unwrap().clone().val.unwrap();
+    let mut wx_message_data = in_template_data.template_text.clone()
+        .ok_or_else(|| anyhow::anyhow!("template_text is required"))?
+        .val
+        .ok_or_else(|| anyhow::anyhow!("template_text.val is required"))?;
     debug!("build_wx_push_message_for_reject_register BEFORE -> msg: {:?}", &wx_message_data);
     // keyword1目前是模版里面写死的.
     let val_keyword2 = wx_message_data.keyword2.value;
@@ -324,9 +358,11 @@ fn build_wx_push_message_for_reject_register(
 
     debug!("build_wx_push_message_for_reject_register AFTER -> msg: {:?}", &wx_message_data);
 
+    let template_id = in_template_data.template_val.clone()
+        .ok_or_else(|| anyhow::anyhow!("template_val is required"))?;
     Ok(ReqWxPushMessage {
         touser: user.openid.clone(),
-        template_id: in_template_data.template_val.clone().unwrap(),
+        template_id,
         url: Some(get_music_room_mini_url()),
         miniprogram: Some(wx_mini_program.clone()),
         data: wx_message_data.clone(),
@@ -365,8 +401,8 @@ pub async fn raw_notify(
     let id_role_student = role_student.hty_role_id.clone();
     let id_role_admin = role_admin.hty_role_id.clone();
 
-    let from_app = if push_info.from_app_id.is_some() {
-        HtyApp::find_by_id(&push_info.clone().from_app_id.unwrap(), extract_conn(fetch_db_conn(&db_pool)?).deref_mut())?
+    let from_app = if let Some(from_app_id) = push_info.from_app_id.clone() {
+        HtyApp::find_by_id(&from_app_id, extract_conn(fetch_db_conn(&db_pool)?).deref_mut())?
     } else {
         crate::get_app_from_host((*host).clone(), extract_conn(fetch_db_conn(&db_pool)?).deref_mut())?
     };
@@ -397,7 +433,9 @@ pub async fn raw_notify(
                     for message in push_messages.clone() {
                         // let first_value = push_message.data.first.value.clone();
 
-                        let send_to = HtyUser::find_by_openid(&message.touser.clone().unwrap(), extract_conn(fetch_db_conn(&db_pool)?).deref_mut())?;
+                        let touser = message.touser.clone()
+                            .ok_or_else(|| anyhow::anyhow!("touser is required in message"))?;
+                        let send_to = HtyUser::find_by_openid(&touser, extract_conn(fetch_db_conn(&db_pool)?).deref_mut())?;
 
                         let tongzhi = build_hty_tongzhi(
                             &String::from("teacher_register"),

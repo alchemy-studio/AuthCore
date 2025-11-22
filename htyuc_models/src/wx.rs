@@ -63,9 +63,7 @@ pub fn identify2(id: &WxId, app_id: &String, conn: &mut PgConnection) -> anyhow:
                 avatar_url: None,
             };
 
-            hty_id = HtyUser::create_with_info_with_tx(&new_user, &Some(new_info), conn)
-                .ok()
-                .unwrap()
+            hty_id = HtyUser::create_with_info_with_tx(&new_user, &Some(new_info), conn)?
                 .clone();
 
             Ok(HtyToken {
@@ -96,14 +94,16 @@ pub async fn get_or_save_wx_access_token(app: &HtyApp, force_refresh: bool) -> a
     // force_refresh = true or
     // token not in cache, refresh the token by accessing WX API.
     let client = reqwest::Client::new();
-    let id_wx = app.wx_id.clone().unwrap();
-    let secret = app.wx_secret.clone();
+    let id_wx = app.wx_id.clone()
+        .ok_or_else(|| anyhow::anyhow!("wx_id is required"))?;
+    let secret = app.wx_secret.clone()
+        .ok_or_else(|| anyhow::anyhow!("wx_secret is required"))?;
 
     let url = "https://api.weixin.qq.com/cgi-bin/token";
-    debug!("app -> {:?}, wx_id = {:?}, secret = {:?}", app.app_desc.clone().unwrap(), id_wx.clone(), secret.clone());
+    debug!("app -> {:?}, wx_id = {:?}, secret = {:?}", app.app_desc.clone(), id_wx.clone(), secret.clone());
     let resp = client
         .get(url)
-        .query(&[("grant_type", "client_credential"), ("appid", id_wx.clone().as_str()), ("secret", secret.clone().unwrap().as_str())])
+        .query(&[("grant_type", "client_credential"), ("appid", id_wx.clone().as_str()), ("secret", secret.as_str())])
         .send().await?
         .text().await?;
 
@@ -121,15 +121,19 @@ pub async fn get_or_save_wx_access_token(app: &HtyApp, force_refresh: bool) -> a
             reason: Some(format!("Get Wx access token met error. Error code: {:?}, Error msg: {:?} ", access_token.errcode, access_token.errmsg).to_string())
         }));
     }
-    let access_token_str = access_token.access_token.unwrap();
-    let exp = access_token.expires_in.unwrap() / 2;
+    let access_token_str = access_token.access_token
+        .ok_or_else(|| anyhow::anyhow!("access_token is missing in response"))?;
+    let exp = access_token.expires_in
+        .ok_or_else(|| anyhow::anyhow!("expires_in is missing in response"))? / 2;
     save_kv_to_redis_with_exp_secs(&token_id, &access_token_str, exp)?;
     Ok(access_token_str)
 }
 
 async fn fn_get_jsapi_ticket(app: Option<HtyApp>, _: Option<ReqWxPushMessage<()>>, _: Option<String>, token: String) -> anyhow::Result<(Option<String>, Option<i32>, Option<String>)> {
+    let app_ref = app.as_ref()
+        .ok_or_else(|| anyhow::anyhow!("app is required"))?;
     let mut token_id = WX_JSAPI_TICKET_PREFIX.to_string();
-    token_id.push_str(app.clone().unwrap().app_id.as_str());
+    token_id.push_str(app_ref.app_id.as_str());
 
     let is_ticket_available = is_key_exist_in_redis(&token_id)?;
 
@@ -154,14 +158,18 @@ async fn fn_get_jsapi_ticket(app: Option<HtyApp>, _: Option<ReqWxPushMessage<()>
 
     debug!("fn_get_jsapi_ticket -> wx_ticket -> {:?}", jsapi_ticket);
 
-    if jsapi_ticket.errcode.clone().unwrap() != 0 {
-        return Err(anyhow!(HtyErr {
-            code: HtyErrCode::WebErr,
-            reason: Some(format!("Get Wx jsapi_ticket met error. Error code: {:?}, Error msg: {:?} ", jsapi_ticket.errcode, jsapi_ticket.errmsg).to_string())
-        }));
+    if let Some(errcode) = jsapi_ticket.errcode.clone() {
+        if errcode != 0 {
+            return Err(anyhow!(HtyErr {
+                code: HtyErrCode::WebErr,
+                reason: Some(format!("Get Wx jsapi_ticket met error. Error code: {:?}, Error msg: {:?} ", jsapi_ticket.errcode, jsapi_ticket.errmsg).to_string())
+            }));
+        }
     }
-    let ticket = jsapi_ticket.ticket.unwrap();
-    let exp = jsapi_ticket.expires_in.unwrap();
+    let ticket = jsapi_ticket.ticket
+        .ok_or_else(|| anyhow::anyhow!("ticket is missing in response"))?;
+    let exp = jsapi_ticket.expires_in
+        .ok_or_else(|| anyhow::anyhow!("expires_in is missing in response"))?;
 
     save_kv_to_redis_with_exp_secs(&token_id, &ticket, exp)?;
 
@@ -169,7 +177,8 @@ async fn fn_get_jsapi_ticket(app: Option<HtyApp>, _: Option<ReqWxPushMessage<()>
 }
 
 pub async fn get_jsapi_ticket(app: &HtyApp) -> anyhow::Result<String> {
-    Ok(get_access_code_and_call_wx_func(fn_get_jsapi_ticket, Some(app.clone()), None, None).await?.unwrap())
+    get_access_code_and_call_wx_func(fn_get_jsapi_ticket, Some(app.clone()), None, None).await?
+        .ok_or_else(|| anyhow::anyhow!("Failed to get jsapi_ticket"))
 }
 
 pub async fn get_cached_wx_all_follower_openids(app: &HtyApp) -> anyhow::Result<Vec<String>> {
@@ -180,7 +189,8 @@ pub async fn refresh_cache_and_get_wx_all_follower_openids(app: &HtyApp) -> anyh
     // let token = get_or_save_wx_access_token(app, false).await?;
 
     let none: Option<ReqWxPushMessage<()>> = None;
-    Ok(get_access_code_and_call_wx_func(fn_refresh_cache_and_get_wx_all_follower_openids, Some(app.clone()), none, None).await?.unwrap())
+    get_access_code_and_call_wx_func(fn_refresh_cache_and_get_wx_all_follower_openids, Some(app.clone()), none, None).await?
+        .ok_or_else(|| anyhow::anyhow!("Failed to get follower openids"))
 }
 
 pub async fn fn_refresh_cache_and_get_wx_all_follower_openids<T: Send + Clone + Serialize + Debug>(app: Option<HtyApp>,
@@ -201,9 +211,12 @@ pub async fn fn_refresh_cache_and_get_wx_all_follower_openids<T: Send + Clone + 
             resp_body.as_str(),
         )?;
         debug!("get_wx_all_followers -> get resp from weixin {:?}", req_followers);
-        let openids = req_followers.data.openid.unwrap();
+        let openids = req_followers.data.openid
+            .ok_or_else(|| anyhow::anyhow!("openid is missing in response"))?;
         let json_openids = serde_json::to_string(&openids)?;
-        let _ = save_kv_to_redis(&all_openids_prefix(&app.unwrap().app_id), &json_openids)?;
+        let app_ref = app.as_ref()
+            .ok_or_else(|| anyhow::anyhow!("app is required"))?;
+        let _ = save_kv_to_redis(&all_openids_prefix(&app_ref.app_id), &json_openids)?;
         Ok((Some(openids), req_followers.errcode.clone(), req_followers.errmsg.clone()))
     } else {
         let resp_body = resp.text().await?;
@@ -230,10 +243,12 @@ pub async fn fn_refresh_and_get_wx_follower_info<T: Send + Clone + Serialize + D
 
     let url = "https://api.weixin.qq.com/cgi-bin/user/info";
 
+    let openid_str = openid
+        .ok_or_else(|| anyhow::anyhow!("openid is required"))?;
     let client = reqwest::Client::new();
     let resp = client
         .get(url)
-        .query(&[("access_token", token.as_str()), ("openid", openid.unwrap().as_str())])
+        .query(&[("access_token", token.as_str()), ("openid", openid_str.as_str())])
         .send()
         .await?;
 
@@ -246,7 +261,9 @@ pub async fn fn_refresh_and_get_wx_follower_info<T: Send + Clone + Serialize + D
 
         debug!("fn_refresh_and_get_wx_follower_info -> get follower info {:?}", req_follower_info);
 
-        let _ = save_kv_to_redis(&openid_info_prefix(&req_follower_info.clone().openid, &app.clone().unwrap().app_id),
+        let app_ref = app.as_ref()
+            .ok_or_else(|| anyhow::anyhow!("app is required"))?;
+        let _ = save_kv_to_redis(&openid_info_prefix(&req_follower_info.clone().openid, &app_ref.app_id),
                                  &json_follower_info.to_string())?;
 
         Ok((Some(req_follower_info.clone()), req_follower_info.errcode.clone(), req_follower_info.errmsg.clone()))
@@ -261,7 +278,8 @@ pub async fn fn_refresh_and_get_wx_follower_info<T: Send + Clone + Serialize + D
 
 pub async fn refresh_and_get_wx_follower_info(openid: &String, app: &HtyApp) -> anyhow::Result<ReqWxFollowerInfo> {
     let none: Option<ReqWxPushMessage<()>> = None;
-    Ok(get_access_code_and_call_wx_func(fn_refresh_and_get_wx_follower_info, Some(app.clone()), none, Some(openid.clone())).await?.unwrap())
+    get_access_code_and_call_wx_func(fn_refresh_and_get_wx_follower_info, Some(app.clone()), none, Some(openid.clone())).await?
+        .ok_or_else(|| anyhow::anyhow!("Failed to get follower info"))
 }
 
 
@@ -320,18 +338,21 @@ pub async fn get_access_code_and_call_wx_func<F, R, U, V>(wx_func: F,
     let mut retry = 0;
     let mut some_wx_call_resp = None;
 
+    let to_app_ref = to_app.as_ref()
+        .ok_or_else(|| anyhow::anyhow!("to_app is required"))?;
+    
     while retry < 3 && !ok {
         let wx_token = if retry == 0 {
-            get_or_save_wx_access_token(&to_app.clone().unwrap(), false).await?
+            get_or_save_wx_access_token(to_app_ref, false).await?
         } else {
-            get_or_save_wx_access_token(&to_app.clone().unwrap(), true).await?
+            get_or_save_wx_access_token(to_app_ref, true).await?
         };
 
         let (wx_call_resp, wx_call_err_code, wx_call_err_msg) = wx_func(to_app.clone(), wx_push_message.clone(), openid.clone(), wx_token).await?;
         debug!("get_access_code_and_call_wx_func -> OK / wx_call_resp: {:?} / wx_call_err_code: {:?} / wx_call_err_msg: {:?}", wx_call_resp, wx_call_err_code, wx_call_err_msg);
 
 
-        if wx_call_err_code.is_none() || (wx_call_err_code.is_some() && wx_call_err_code.unwrap() == 0) {
+        if wx_call_err_code.is_none() || (wx_call_err_code.is_some() && wx_call_err_code.as_ref().unwrap() == &0) {
             ok = true;
             some_wx_call_resp = wx_call_resp;
         } else {
@@ -398,7 +419,9 @@ pub async fn fn_push_wx_message<T: Send + Clone + Serialize + Debug>(
     // todo: check NULL of wx_push_message
     debug!("fn_push_wx_message -> to_app: {:?} / wx_push_message: {:?} / token: {:?}", _to_app, wx_push_message, token);
     let wx_url = "https://api.weixin.qq.com/cgi-bin/message/template/send";
-    let post_body = serde_json::to_string::<ReqWxPushMessage<T>>(&wx_push_message.unwrap())?;
+    let wx_push_message_ref = wx_push_message
+        .ok_or_else(|| anyhow::anyhow!("wx_push_message is required"))?;
+    let post_body = serde_json::to_string::<ReqWxPushMessage<T>>(&wx_push_message_ref)?;
 
     debug!("fn_push_wx_message -> post wx body {:?} ", post_body);
 
@@ -423,20 +446,22 @@ pub async fn fn_push_wx_message<T: Send + Clone + Serialize + Debug>(
 pub async fn push_wx_message<T: Serialize + Clone + Send + Debug>(to_app: &HtyApp, wx_push_message: &ReqWxPushMessage<T>) -> anyhow::Result<()> {
     debug!("push_wx_message START -> to_app: {:?} / wx_push_message: {:?}", to_app, wx_push_message);
 
-    if skip_wx_push() {
+    if skip_wx_push().unwrap_or(false) {
         debug!("push_wx_message() ::BYPASSED::");
         Ok(())
     } else {
-        if wx_push_message.touser.is_none() || wx_push_message.touser.clone().unwrap().trim().is_empty() {
+        if wx_push_message.touser.is_none() || wx_push_message.touser.as_ref().map(|s| s.trim().is_empty()).unwrap_or(true) {
             debug!("push_wx_message() ::TO_USER_OPENID IS NULL:: 无法推送消息");
             Ok(())
         } else {
             let wx_push_resp = get_access_code_and_call_wx_func(fn_push_wx_message,
                                                                 Some(to_app.clone()),
                                                                 Some(wx_push_message.clone()),
-                                                                None).await?.unwrap();
+                                                                None).await?
+                .ok_or_else(|| anyhow::anyhow!("Failed to push wx message"))?;
             debug!("push_wx_message -> wx_push_resp -> {:?}", wx_push_resp);
-            let resp_code = wx_push_resp.errcode.unwrap();
+            let resp_code = wx_push_resp.errcode
+                .ok_or_else(|| anyhow::anyhow!("errcode is missing in response"))?;
             if resp_code == 0 {
                 Ok(())
             } else {
@@ -453,7 +478,9 @@ macro_rules! remote_send_tongzhi_and_push_wx_message {
             // huiwingn内部通知（小程序内部）
             let r_created_tongzhi_id = create_tongzhi(&$req_hty_tongzhi, &$sudoer_copy).await;
             // 推送公众号小程序通知.
-            let _ = ::htyuc_models::wx::push_wx_message2(&$to_app, &$push_message, Some(r_created_tongzhi_id.unwrap())).await;
+            if let Ok(tongzhi_id) = r_created_tongzhi_id {
+                let _ = ::htyuc_models::wx::push_wx_message2(&$to_app, &$push_message, Some(tongzhi_id)).await;
+            }
         });
     }
 }
@@ -485,29 +512,31 @@ pub async fn push_wx_message2<T: Serialize + Clone + Send + Debug>(to_app: &HtyA
 
     let mut wx_push_message = in_wx_push_message.clone();
 
-    if some_created_hty_tongzhi_id.is_some() && in_wx_push_message.miniprogram.is_some() {
-        let mut c_miniprogram = in_wx_push_message.miniprogram.clone().unwrap();
-        c_miniprogram.pagepath = format!("pages/index/index?hty_tongzhi_id={}", some_created_hty_tongzhi_id.clone().unwrap());
-        // c_miniprogram.path = format!("sample?hty_tongzhi_id={}", some_created_hty_tongzhi_id.clone().unwrap());
+    if let (Some(tongzhi_id), Some(miniprogram)) = (some_created_hty_tongzhi_id.as_ref(), in_wx_push_message.miniprogram.as_ref()) {
+        let mut c_miniprogram = miniprogram.clone();
+        c_miniprogram.pagepath = format!("pages/index/index?hty_tongzhi_id={}", tongzhi_id);
+        // c_miniprogram.path = format!("sample?hty_tongzhi_id={}", tongzhi_id);
         wx_push_message.miniprogram = Some(c_miniprogram);
     }
 
     debug!("push_wx_message2 -> {:?}", wx_push_message);
 
-    if skip_wx_push() {
+    if skip_wx_push().unwrap_or(false) {
         debug!("push_wx_message2() ::BYPASSED::");
         Ok(())
     } else {
-        if wx_push_message.touser.is_none() || wx_push_message.touser.clone().unwrap().trim().is_empty() {
+        if wx_push_message.touser.is_none() || wx_push_message.touser.as_ref().map(|s| s.trim().is_empty()).unwrap_or(true) {
             debug!("push_wx_message2() ::TO_USER_OPENID IS NULL:: 无法推送消息");
             Ok(())
         } else {
             let wx_push_resp = get_access_code_and_call_wx_func(fn_push_wx_message,
                                                                 Some(to_app.clone()),
                                                                 Some(wx_push_message.clone()),
-                                                                None).await?.unwrap();
+                                                                None).await?
+                .ok_or_else(|| anyhow::anyhow!("Failed to push wx message"))?;
             debug!("push_wx_message2 -> wx_push_resp: {:?}", wx_push_resp);
-            let resp_code = wx_push_resp.errcode.unwrap();
+            let resp_code = wx_push_resp.errcode
+                .ok_or_else(|| anyhow::anyhow!("errcode is missing in response"))?;
             if resp_code == 0 {
                 Ok(())
             } else {
@@ -542,7 +571,8 @@ pub async fn get_union_id_by_auth_code(wx_id: String, secret: String, code: Stri
         }));
     }
 
-    let union_id_str = access_token.unionid.unwrap();
+    let union_id_str = access_token.unionid
+        .ok_or_else(|| anyhow::anyhow!("unionid is missing in response"))?;
 
     debug!("get_union_id_by_auth_code -> union_id_str -> {:?}", union_id_str);
 
@@ -559,21 +589,21 @@ pub fn extract_template_data_and_wx_message_data_from_template<
         req_in_template
     );
 
-    let in_template_data = req_in_template
+    let datas = req_in_template
         .datas
         .clone()
-        .unwrap()
+        .ok_or_else(|| anyhow::anyhow!("datas is required"))?;
+    let first_data = datas
         .get(0) // just assume we have only one template data.
-        .clone()
-        .unwrap()
-        .to_db_struct()?;
+        .ok_or_else(|| anyhow::anyhow!("at least one template data is required"))?
+        .clone();
+    let in_template_data = first_data.to_db_struct()?;
     let raw_wx_message_text = in_template_data
         .template_text
         .clone()
-        .unwrap()
-        .clone()
+        .ok_or_else(|| anyhow::anyhow!("template_text is required"))?
         .val
-        .unwrap();
+        .ok_or_else(|| anyhow::anyhow!("template_text.val is required"))?;
     // let wrapped_data = SingleVal {
     //     val: Some(raw_wx_message_data)
     // };

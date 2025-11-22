@@ -294,7 +294,8 @@ pub fn upyun_upt_download(url: &str, config_file: &str) -> Result<(), anyhow::Er
 
     if resp.status() == reqwest::StatusCode::OK {
         let path = Path::new(uri);
-        let local_file = path.file_name().unwrap();
+        let local_file = path.file_name()
+            .ok_or_else(|| anyhow::anyhow!("Failed to get file name from path"))?;
         let mut file = std::fs::File::create(local_file)?;
         let mut content = Cursor::new(resp.bytes()?);
         std::io::copy(&mut content, &mut file)?;

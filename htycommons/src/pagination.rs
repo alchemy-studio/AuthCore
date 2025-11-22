@@ -11,7 +11,7 @@ pub trait Paginate: Sized {
 
 impl<T> Paginate for T {
     fn paginate(self, page: Option<i64>) -> Paginated<Self> {
-        let offset = if page.is_some() { (page.clone().unwrap() - 1) * DEFAULT_PER_PAGE } else { -1 };
+        let offset = if let Some(p) = page { (p - 1) * DEFAULT_PER_PAGE } else { -1 };
         Paginated {
             query: self,
             some_per_page: Some(DEFAULT_PER_PAGE),
@@ -35,8 +35,8 @@ pub struct Paginated<T> {
 
 impl<T> Paginated<T> {
     pub fn per_page(self, some_per_page: Option<i64>) -> Self {
-        let per_page = if some_per_page.is_some() { some_per_page.clone().unwrap() } else { -1 };
-        let offset = if some_per_page.is_some() && self.page.is_some() { (self.page.clone().unwrap() - 1) * some_per_page.clone().unwrap() } else { -1 };
+        let per_page = some_per_page.unwrap_or(-1);
+        let offset = if let (Some(sp), Some(p)) = (some_per_page, self.page) { (p - 1) * sp } else { -1 };
 
         Paginated {
             some_per_page,
@@ -60,8 +60,7 @@ impl<T> Paginated<T> {
 
         let unwrapped_results = results?;
 
-        if some_page.is_some() && some_per_page.is_some() {
-            let per_page = some_per_page.unwrap();
+        if let (Some(_), Some(per_page)) = (some_page, some_per_page) {
             let total = unwrapped_results.get(0).map(|x| x.1).unwrap_or(0);
             let records = unwrapped_results.into_iter().map(|x| x.0).collect();
             let total_pages = (total as f64 / per_page as f64).ceil() as i64;

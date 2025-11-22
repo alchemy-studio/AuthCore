@@ -24,7 +24,8 @@ async fn main() {
 
     logger_init();
 
-    launch_rocket(get_uc_port(), uc_rocket(&get_uc_db_url())).await;
+    let port = get_uc_port().expect("Failed to get UC_PORT");
+    launch_rocket(port, uc_rocket(&get_uc_db_url())).await.expect("Failed to launch rocket");
 
     // this is reachable only after `Shutdown::notify()` or `Ctrl+C`.
     println!("Rocket: deorbit.");
