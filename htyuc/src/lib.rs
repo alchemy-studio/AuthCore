@@ -1095,25 +1095,13 @@ async fn find_tongzhis(
         }
     }
 
-    if params.get("tongzhi_status").is_some() {
+    if let Some(status_str) = params.get("tongzhi_status") {
         // READ / UNREAD
-        the_tongzhi_status = Some(
-            params
-                .get("tongzhi_status")
-                .unwrap()
-                .parse::<String>()
-                .unwrap_or_default(),
-        );
+        the_tongzhi_status = Some(status_str.parse::<String>().unwrap_or_default());
     }
 
-    if params.get("role_id").is_some() {
-        the_role_id = Some(
-            params
-                .get("role_id")
-                .unwrap()
-                .parse::<String>()
-                .unwrap_or_default(),
-        );
+    if let Some(role_id_str) = params.get("role_id") {
+        the_role_id = Some(role_id_str.parse::<String>().unwrap_or_default());
     }
 
     match raw_find_tongzhis(
@@ -3243,8 +3231,7 @@ fn verify_user_with_info(
             }));
         };
 
-        if !info.is_none() {
-            let in_info = info.clone().unwrap();
+        if let Some(in_info) = info.clone() {
             let in_app_id = match in_info.app_id {
                 Some(app_id) => app_id,
                 None => HtyApp::find_by_domain(&app_domain, conn)?.app_id,
@@ -3588,9 +3575,8 @@ async fn find_tongzhi_by_id(
 
     match raw_find_tongzhi_by_id(&tongzhi_id, extract_conn(conn).deref_mut()) {
         Ok(some_tz) => {
-            if some_tz.is_some() {
-                let req_tz = some_tz.unwrap().to_req();
-
+            if let Some(tz) = some_tz {
+                let req_tz = tz.to_req();
                 wrap_json_ok_resp(Some(req_tz))
             } else {
                 wrap_json_ok_resp(None)
@@ -4153,10 +4139,15 @@ fn raw_create_or_update_actions(
     db_pool: Arc<DbState>,
 ) -> anyhow::Result<ReqHtyAction> {
     let action = hty_action.clone();
-    if action.labels.is_some() {
-        for label in action.labels.clone().unwrap() {
+    if let Some(labels) = action.labels.clone() {
+        for label in labels {
+            let hty_label_id = label.hty_label_id.clone()
+                .ok_or_else(|| anyhow!(HtyErr {
+                    code: HtyErrCode::NullErr,
+                    reason: Some("hty_label_id is required".into()),
+                }))?;
             match HtyLabel::verify_exist_by_id(
-                &label.hty_label_id.unwrap(),
+                &hty_label_id,
                 extract_conn(fetch_db_conn(&db_pool)?).deref_mut(),
             ) {
                 Ok(true) => continue,
@@ -4169,10 +4160,15 @@ fn raw_create_or_update_actions(
             }
         }
     }
-    if action.roles.is_some() {
-        for role in action.roles.clone().unwrap() {
+    if let Some(roles) = action.roles.clone() {
+        for role in roles {
+            let hty_role_id = role.hty_role_id.clone()
+                .ok_or_else(|| anyhow!(HtyErr {
+                    code: HtyErrCode::NullErr,
+                    reason: Some("hty_role_id is required".into()),
+                }))?;
             match HtyRole::verify_exist_by_id(
-                &role.hty_role_id.unwrap(),
+                &hty_role_id,
                 extract_conn(fetch_db_conn(&db_pool)?).deref_mut(),
             ) {
                 Ok(true) => continue,
@@ -4185,18 +4181,16 @@ fn raw_create_or_update_actions(
             }
         }
     }
-    if action.action_name.is_none() {
-        return Err(anyhow!(HtyErr {
+    let action_name = action.action_name.clone()
+        .ok_or_else(|| anyhow!(HtyErr {
             code: HtyErrCode::NullErr,
-            reason: Some("action name can not be none".into()),
-        }));
-    }
-    if action.action_status.is_none() {
-        return Err(anyhow!(HtyErr {
+            reason: Some("action_name is required".into()),
+        }))?;
+    let action_status = action.action_status.clone()
+        .ok_or_else(|| anyhow!(HtyErr {
             code: HtyErrCode::NullErr,
-            reason: Some("action status can not be none".into()),
-        }));
-    }
+            reason: Some("action_status is required".into()),
+        }))?;
 
     let params = HashMap::new();
     // action_id is none, then create new action
@@ -4207,30 +4201,40 @@ fn raw_create_or_update_actions(
             let mut res_action = action.clone();
             let in_action = HtyAction {
                 hty_action_id: uuid(),
-                action_name: action.action_name.clone().unwrap(),
+                action_name: action_name.clone(),
                 action_desc: action.action_desc.clone(),
-                action_status: action.action_status.clone().unwrap(),
+                action_status: action_status.clone(),
             };
             let created_action = HtyAction::create(&in_action, conn)?;
             res_action.hty_action_id = Some(created_action.hty_action_id.clone());
-            if action.labels.is_some() {
-                for label in action.labels.clone().unwrap() {
+            if let Some(labels) = action.labels.clone() {
+                for label in labels {
+                    let label_id = label.hty_label_id.clone()
+                        .ok_or_else(|| anyhow!(HtyErr {
+                            code: HtyErrCode::WebErr,
+                            reason: Some("hty_label_id is required".into()),
+                        }))?;
                     let in_label = ActionLabel {
                         the_id: uuid(),
                         action_id: created_action.hty_action_id.clone(),
-                        label_id: label.hty_label_id.clone().unwrap(),
+                        label_id,
                     };
                     ActionLabel::create(&in_label, conn)?;
                 }
             }
-            if action.roles.is_some() {
-                for role in action.roles.clone().unwrap() {
-                    let in_action = RoleAction {
+            if let Some(roles) = action.roles.clone() {
+                for role in roles {
+                    let role_id = role.hty_role_id.clone()
+                        .ok_or_else(|| anyhow!(HtyErr {
+                            code: HtyErrCode::WebErr,
+                            reason: Some("hty_role_id is required".into()),
+                        }))?;
+                    let in_role_action = RoleAction {
                         the_id: uuid(),
-                        role_id: role.hty_role_id.clone().unwrap(),
-                        action_id: in_action.hty_action_id.clone(),
+                        role_id,
+                        action_id: created_action.hty_action_id.clone(),
                     };
-                    RoleAction::create(&in_action, conn)?;
+                    RoleAction::create(&in_role_action, conn)?;
                 }
             }
             return Ok(res_action.clone());
@@ -4248,35 +4252,40 @@ fn raw_create_or_update_actions(
         };
     }
 
-    // action_id is some, then update existing role
-    if action.hty_action_id.is_some() {
+    // action_id is some, then update existing action
+    if let Some(hty_action_id) = action.hty_action_id.clone() {
         let task_update_action = move |_in_params: Option<HashMap<String, ReqHtyAction>>,
                                        conn: &mut PgConnection|
                                        -> anyhow::Result<ReqHtyAction> {
-            RoleAction::delete_by_action_id(&action.hty_action_id.clone().unwrap(), conn)?;
-            ActionLabel::delete_by_action_id(&action.hty_action_id.clone().unwrap(), conn)?;
-            match HtyAction::verify_exist_by_id(&action.hty_action_id.clone().unwrap(), conn) {
+            RoleAction::delete_by_action_id(&hty_action_id, conn)?;
+            ActionLabel::delete_by_action_id(&hty_action_id, conn)?;
+            match HtyAction::verify_exist_by_id(&hty_action_id, conn) {
                 Ok(true) => {
                     let update_action = HtyAction {
-                        hty_action_id: action.hty_action_id.clone().unwrap(),
-                        action_name: action.action_name.clone().unwrap(),
+                        hty_action_id: hty_action_id.clone(),
+                        action_name: action_name.clone(),
                         action_desc: action.clone().action_desc,
-                        action_status: action.action_status.clone().unwrap(),
+                        action_status: action_status.clone(),
                     };
                     HtyAction::update(&update_action, conn)?;
-                    if action.labels.is_some() {
-                        for label in action.labels.clone().unwrap() {
+                    if let Some(labels) = action.labels.clone() {
+                        for label in labels {
+                            let label_id = label.hty_label_id.clone()
+                                .ok_or_else(|| anyhow!(HtyErr {
+                                    code: HtyErrCode::WebErr,
+                                    reason: Some("hty_label_id is required".into()),
+                                }))?;
                             match ActionLabel::verify_exist_by_action_id_and_label_id(
-                                &action.hty_action_id.clone().unwrap(),
-                                &label.hty_label_id.clone().unwrap(),
+                                &hty_action_id,
+                                &label_id,
                                 conn,
                             ) {
                                 Ok(true) => continue,
                                 Ok(false) => {
                                     let in_action_label = ActionLabel {
                                         the_id: uuid(),
-                                        action_id: action.hty_action_id.clone().unwrap(),
-                                        label_id: label.hty_label_id.clone().unwrap(),
+                                        action_id: hty_action_id.clone(),
+                                        label_id,
                                     };
                                     ActionLabel::create(&in_action_label, conn)?;
                                 }
@@ -4289,19 +4298,24 @@ fn raw_create_or_update_actions(
                             }
                         }
                     }
-                    if action.roles.is_some() {
-                        for role in action.roles.clone().unwrap() {
+                    if let Some(roles) = action.roles.clone() {
+                        for role in roles {
+                            let role_id = role.hty_role_id.clone()
+                                .ok_or_else(|| anyhow!(HtyErr {
+                                    code: HtyErrCode::WebErr,
+                                    reason: Some("hty_role_id is required".into()),
+                                }))?;
                             match RoleAction::verify_exist_by_role_id_and_action_id(
-                                &role.hty_role_id.clone().unwrap(),
-                                &action.hty_action_id.clone().unwrap(),
+                                &role_id,
+                                &hty_action_id,
                                 conn,
                             ) {
                                 Ok(true) => continue,
                                 Ok(false) => {
                                     let in_role_action = RoleAction {
                                         the_id: uuid(),
-                                        role_id: role.hty_role_id.clone().unwrap(),
-                                        action_id: action.hty_action_id.clone().unwrap(),
+                                        role_id,
+                                        action_id: hty_action_id.clone(),
                                     };
                                     RoleAction::create(&in_role_action, conn)?;
                                 }
@@ -4363,10 +4377,15 @@ fn raw_create_or_update_labels(
     db_pool: Arc<DbState>,
 ) -> anyhow::Result<ReqHtyLabel> {
     let label = hty_label.clone();
-    if label.roles.is_some() {
-        for role in label.roles.clone().unwrap() {
+    if let Some(roles) = label.roles.clone() {
+        for role in roles {
+            let hty_role_id = role.hty_role_id.clone()
+                .ok_or_else(|| anyhow!(HtyErr {
+                    code: HtyErrCode::NullErr,
+                    reason: Some("hty_role_id is required".into()),
+                }))?;
             match HtyRole::verify_exist_by_id(
-                &role.hty_role_id.clone().unwrap(),
+                &hty_role_id,
                 extract_conn(fetch_db_conn(&db_pool)?).deref_mut(),
             ) {
                 Ok(true) => continue,
@@ -4379,10 +4398,15 @@ fn raw_create_or_update_labels(
             }
         }
     }
-    if label.actions.is_some() {
-        for action in label.actions.clone().unwrap() {
+    if let Some(actions) = label.actions.clone() {
+        for action in actions {
+            let hty_action_id = action.hty_action_id.clone()
+                .ok_or_else(|| anyhow!(HtyErr {
+                    code: HtyErrCode::NullErr,
+                    reason: Some("hty_action_id is required".into()),
+                }))?;
             match HtyAction::verify_exist_by_id(
-                &action.hty_action_id.clone().unwrap(),
+                &hty_action_id,
                 extract_conn(fetch_db_conn(&db_pool)?).deref_mut(),
             ) {
                 Ok(true) => continue,
@@ -4395,18 +4419,16 @@ fn raw_create_or_update_labels(
             }
         }
     }
-    if label.label_name.is_none() {
-        return Err(anyhow!(HtyErr {
+    let label_name = label.label_name.clone()
+        .ok_or_else(|| anyhow!(HtyErr {
             code: HtyErrCode::NullErr,
-            reason: Some("label name can not be none".into()),
-        }));
-    }
-    if label.label_status.is_none() {
-        return Err(anyhow!(HtyErr {
+            reason: Some("label_name is required".into()),
+        }))?;
+    let label_status = label.label_status.clone()
+        .ok_or_else(|| anyhow!(HtyErr {
             code: HtyErrCode::NullErr,
-            reason: Some("label status can not be none".into()),
-        }));
-    }
+            reason: Some("label_status is required".into()),
+        }))?;
 
     let params = HashMap::new();
     // label_id is none, then create new label
@@ -4417,28 +4439,38 @@ fn raw_create_or_update_labels(
             let mut res_label = label.clone();
             let in_label = HtyLabel {
                 hty_label_id: uuid(),
-                label_name: label.label_name.clone().unwrap(),
+                label_name: label_name.clone(),
                 label_desc: label.label_desc.clone(),
-                label_status: label.label_status.clone().unwrap(),
+                label_status: label_status.clone(),
                 style: label.style.clone(),
             };
             let created_label = HtyLabel::create(&in_label, conn)?;
             res_label.hty_label_id = Some(created_label.hty_label_id.clone());
-            if label.actions.is_some() {
-                for action in label.actions.clone().unwrap() {
+            if let Some(actions) = label.actions.clone() {
+                for action in actions {
+                    let action_id = action.hty_action_id.clone()
+                        .ok_or_else(|| anyhow!(HtyErr {
+                            code: HtyErrCode::WebErr,
+                            reason: Some("hty_action_id is required".into()),
+                        }))?;
                     let in_action_label = ActionLabel {
                         the_id: uuid(),
-                        action_id: action.hty_action_id.clone().unwrap(),
+                        action_id,
                         label_id: created_label.hty_label_id.clone(),
                     };
                     ActionLabel::create(&in_action_label, conn)?;
                 }
             }
-            if label.roles.is_some() {
-                for role in label.roles.clone().unwrap() {
+            if let Some(roles) = label.roles.clone() {
+                for role in roles {
+                    let role_id = role.hty_role_id.clone()
+                        .ok_or_else(|| anyhow!(HtyErr {
+                            code: HtyErrCode::WebErr,
+                            reason: Some("hty_role_id is required".into()),
+                        }))?;
                     let in_role_label = RoleLabel {
                         the_id: uuid(),
-                        role_id: role.hty_role_id.clone().unwrap(),
+                        role_id,
                         label_id: created_label.hty_label_id.clone(),
                     };
                     RoleLabel::create(&in_role_label, conn)?;
@@ -4464,35 +4496,40 @@ fn raw_create_or_update_labels(
     }
 
     // label_id is some, then update existing label
-    if label.hty_label_id.is_some() {
+    if let Some(hty_label_id) = label.hty_label_id.clone() {
         let task_update_label = move |_in_params: Option<HashMap<String, ReqHtyLabel>>,
                                       conn: &mut PgConnection|
                                       -> anyhow::Result<ReqHtyLabel> {
-            RoleLabel::delete_by_label_id(&label.hty_label_id.clone().unwrap(), conn)?;
-            ActionLabel::delete_by_label_id(&label.hty_label_id.clone().unwrap(), conn)?;
-            match HtyLabel::verify_exist_by_id(&label.hty_label_id.clone().unwrap(), conn) {
+            RoleLabel::delete_by_label_id(&hty_label_id, conn)?;
+            ActionLabel::delete_by_label_id(&hty_label_id, conn)?;
+            match HtyLabel::verify_exist_by_id(&hty_label_id, conn) {
                 Ok(true) => {
                     let update_label = HtyLabel {
-                        hty_label_id: label.hty_label_id.clone().unwrap(),
-                        label_name: label.label_name.clone().unwrap(),
+                        hty_label_id: hty_label_id.clone(),
+                        label_name: label_name.clone(),
                         label_desc: label.clone().label_desc,
-                        label_status: label.label_status.clone().unwrap(),
+                        label_status: label_status.clone(),
                         style: label.style.clone(),
                     };
                     HtyLabel::update(&update_label, conn)?;
-                    if label.actions.is_some() {
-                        for action in label.actions.clone().unwrap() {
+                    if let Some(actions) = label.actions.clone() {
+                        for action in actions {
+                            let action_id = action.hty_action_id.clone()
+                                .ok_or_else(|| anyhow!(HtyErr {
+                                    code: HtyErrCode::WebErr,
+                                    reason: Some("hty_action_id is required".into()),
+                                }))?;
                             match ActionLabel::verify_exist_by_action_id_and_label_id(
-                                &action.hty_action_id.clone().unwrap(),
-                                &label.hty_label_id.clone().unwrap(),
+                                &action_id,
+                                &hty_label_id,
                                 conn,
                             ) {
                                 Ok(true) => continue,
                                 Ok(false) => {
                                     let in_action_label = ActionLabel {
                                         the_id: uuid(),
-                                        action_id: action.hty_action_id.clone().unwrap(),
-                                        label_id: label.hty_label_id.clone().unwrap(),
+                                        action_id,
+                                        label_id: hty_label_id.clone(),
                                     };
                                     ActionLabel::create(&in_action_label, conn)?;
                                 }
@@ -4505,19 +4542,24 @@ fn raw_create_or_update_labels(
                             }
                         }
                     }
-                    if label.roles.is_some() {
-                        for role in label.roles.clone().unwrap() {
+                    if let Some(roles) = label.roles.clone() {
+                        for role in roles {
+                            let role_id = role.hty_role_id.clone()
+                                .ok_or_else(|| anyhow!(HtyErr {
+                                    code: HtyErrCode::WebErr,
+                                    reason: Some("hty_role_id is required".into()),
+                                }))?;
                             match RoleLabel::verify_exist_by_role_id_and_label_id(
-                                &role.hty_role_id.clone().unwrap(),
-                                &label.hty_label_id.clone().unwrap(),
+                                &role_id,
+                                &hty_label_id,
                                 conn,
                             ) {
                                 Ok(true) => continue,
                                 Ok(false) => {
                                     let in_role_label = RoleLabel {
                                         the_id: uuid(),
-                                        role_id: role.hty_role_id.clone().unwrap(),
-                                        label_id: label.hty_label_id.clone().unwrap(),
+                                        role_id,
+                                        label_id: hty_label_id.clone(),
                                     };
                                     RoleLabel::create(&in_role_label, conn)?;
                                 }
@@ -4631,10 +4673,15 @@ pub async fn find_all_valid_teachers(
         Ok(in_users) => {
             let mut resp = Vec::new();
             for in_user in in_users {
-                if in_user.enabled.is_some() {
-                    let is_enabled = in_user.enabled.clone().unwrap();
-                    if is_enabled && in_user.infos.clone().unwrap().get(0).unwrap().is_registered {
-                        resp.push(in_user.clone());
+                if let Some(is_enabled) = in_user.enabled.clone() {
+                    if is_enabled {
+                        if let Some(infos) = in_user.infos.clone() {
+                            if let Some(first_info) = infos.get(0) {
+                                if first_info.is_registered {
+                                    resp.push(in_user.clone());
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -4797,17 +4844,18 @@ fn raw_find_users_with_info_by_role(
     let user_infos = role.find_linked_user_app_info(conn)?;
     let out_user_infos: Vec<UserAppInfo> = user_infos
         .into_iter()
-        .filter(|item| item.clone().app_id.unwrap() == app_id.app_id)
+        .filter(|item| item.app_id.as_ref().map(|id| id == &app_id.app_id).unwrap_or(false))
         .collect();
     let out_req_user_infos: Vec<ReqUserAppInfo> =
         out_user_infos.iter().map(|item| item.to_req()).collect();
     let res: Vec<ReqHtyUserWithInfos> = out_req_user_infos
         .iter()
-        .map(|item| {
-            let user = HtyUser::find_by_hty_id(&item.clone().hty_id.unwrap(), conn).unwrap();
+        .filter_map(|item| {
+            let hty_id = item.hty_id.clone()?;
+            let user = HtyUser::find_by_hty_id(&hty_id, conn).ok()?;
             let mut infos = Vec::new();
             infos.push(item.clone());
-            let out = ReqHtyUserWithInfos {
+            Some(ReqHtyUserWithInfos {
                 hty_id: Some(user.hty_id.clone()),
                 union_id: user.union_id.clone(),
                 enabled: Some(user.enabled),
@@ -4818,8 +4866,7 @@ fn raw_find_users_with_info_by_role(
                 infos: Some(infos),
                 info_roles: None,
                 settings: user.settings.clone(),
-            };
-            out
+            })
         })
         .collect();
     Ok(res)
@@ -5129,15 +5176,18 @@ async fn raw_find_user_with_info_by_token(
 
     debug(format!("raw_find_user_with_info_by_token -> app_id: {:?}", in_app).as_str());
 
+    let hty_id = token.hty_id.clone()
+        .ok_or_else(|| anyhow::anyhow!("hty_id is required in token"))?;
+    
     let in_user = HtyUser::find_by_hty_id(
-        &token.hty_id.clone().unwrap()[..],
+        &hty_id[..],
         extract_conn(fetch_db_conn(&db_pool)?).deref_mut(),
     )?;
 
     debug(format!("raw_find_user_with_info_by_token -> user: {:?}", in_user).as_str());
 
     let info = UserAppInfo::find_by_hty_id_and_app_id(
-        &token.hty_id.clone().unwrap(),
+        &hty_id,
         &in_app.app_id,
         extract_conn(fetch_db_conn(&db_pool)?).deref_mut(),
     )?;
@@ -5162,8 +5212,10 @@ async fn raw_find_user_with_info_by_token(
             role_name: in_role.role_name.clone(),
         };
 
+        let hty_role_id = out_role.hty_role_id.clone()
+            .ok_or_else(|| anyhow::anyhow!("hty_role_id is required"))?;
         let labels = HtyLabel::find_all_by_role_id(
-            &out_role.hty_role_id.clone().unwrap(),
+            &hty_role_id,
             extract_conn(fetch_db_conn(&db_pool)?).deref_mut(),
         )?;
         out_role.labels = Some(HtyLabel::to_req_labels(&labels));
@@ -5199,12 +5251,16 @@ async fn raw_find_user_with_info_by_token(
     // });
 
     task::spawn(async move {
-        let _ = post_login(
-            &in_user,
-            &in_app,
-            extract_conn(fetch_db_conn(&db_pool).unwrap()).deref_mut(),
-        )
-            .await; // todo: unwrap should be fixed.
+        if let Ok(conn) = fetch_db_conn(&db_pool) {
+            let _ = post_login(
+                &in_user,
+                &in_app,
+                extract_conn(conn).deref_mut(),
+            )
+                .await;
+        } else {
+            error!("Failed to get db connection in post_login task");
+        }
     });
 
     Ok(req_hty_user_with_infos)
@@ -5234,7 +5290,9 @@ fn raw_sudo2(auth: AuthorizationHeader, host: HtyHostHeader, to_user_id: String,
     let user_tags = get_all_db_tags_of_the_user(auth, host, conn)?;
     debug!("raw_sudo2 -> user_tags: {:?}", user_tags);
 
-    let id_current_user = jwt_decode_token(&(*the_auth).clone())?.hty_id.unwrap();
+    let id_current_user = jwt_decode_token(&(*the_auth).clone())?
+        .hty_id
+        .ok_or_else(|| anyhow::anyhow!("hty_id is required in token"))?;
 
     let user_app_info = UserAppInfo::find_by_id(&to_user_id, conn)?;
     let id_to_user = user_app_info.hty_id.clone();
@@ -5365,7 +5423,8 @@ fn raw_login_with_password(
     }
 
     let info = UserAppInfo::find_by_username_and_app_id(
-        &req_login.username.clone().unwrap(),
+        &req_login.username.clone()
+            .ok_or_else(|| anyhow::anyhow!("username is required"))?,
         &app.app_id,
         extract_conn(fetch_db_conn(&db_pool)?).deref_mut(),
     )?;
@@ -5395,7 +5454,16 @@ pub async fn wx_qr_login(State(db_pool): State<Arc<DbState>>, host: HtyHostHeade
     debug!("wx_qr_login -> starts");
 
     let app_domain = (*host).clone();
-    let code = req_code.code.unwrap();
+    let code = match req_code.code {
+        Some(c) => c,
+        None => {
+            error!("wx_qr_login -> code is required");
+            return (StatusCode::BAD_REQUEST, wrap_json_hty_err::<String>(HtyErr {
+                code: HtyErrCode::WebErr,
+                reason: Some("code is required".into()),
+            }));
+        }
+    };
 
     debug!("wx_qr_login -> app_domain {:?} / code {:?}", &app_domain, &code);
 
@@ -5415,11 +5483,14 @@ async fn raw_wx_qr_login(code: String, app_domain: String, db_pool: Arc<DbState>
     debug!("raw_wx_qr_login -> domain: {:?} / code: {:?}", &app_domain, &code);
 
     let app = HtyApp::find_by_domain(&app_domain, extract_conn(fetch_db_conn(&db_pool)?).deref_mut())?;
-    let wx_secret = app.wx_secret.clone().unwrap();
+    let wx_secret = app.wx_secret.clone()
+        .ok_or_else(|| anyhow::anyhow!("wx_secret is required"))?;
+    let wx_id = app.wx_id.clone()
+        .ok_or_else(|| anyhow::anyhow!("wx_id is required"))?;
 
     debug!("raw_wx_qr_login -> domain: {:?} / app: {:?} / secret: {:?} / code: {:?}", &app_domain, &app, &wx_secret, &code);
 
-    let union_id = get_union_id_by_auth_code(app.wx_id.clone().unwrap(), wx_secret, code).await?;
+    let union_id = get_union_id_by_auth_code(wx_id, wx_secret, code).await?;
 
     debug!("raw_wx_qr_login -> union_id: {:?}", &union_id);
 
@@ -5484,14 +5555,26 @@ async fn verify_user_enabled_and_registered_in_app(_sudoer: HtySudoerTokenHeader
     let in_app_domain = get_some_from_query_params::<String>("app_domain", &params);
     let in_hty_id = get_some_from_query_params::<String>("hty_id", &params);
 
-    if in_app_domain.is_none() || in_hty_id.is_none() {
-        return wrap_json_hty_err::<bool>(HtyErr {
-            code: HtyErrCode::WebErr,
-            reason: Some("app_domain or hty_id is none".into()),
-        });
-    }
+    let app_domain = match in_app_domain {
+        Some(d) => d,
+        None => {
+            return wrap_json_hty_err::<bool>(HtyErr {
+                code: HtyErrCode::WebErr,
+                reason: Some("app_domain is required".into()),
+            });
+        }
+    };
+    let hty_id = match in_hty_id {
+        Some(id) => id,
+        None => {
+            return wrap_json_hty_err::<bool>(HtyErr {
+                code: HtyErrCode::WebErr,
+                reason: Some("hty_id is required".into()),
+            });
+        }
+    };
 
-    match raw_verify_user_enabled_and_registered_in_app(in_app_domain.unwrap(), in_hty_id.unwrap(), db_pool).await {
+    match raw_verify_user_enabled_and_registered_in_app(app_domain, hty_id, db_pool).await {
         Ok(result) => {
             debug!("verify_user_enabled_and_registered_in_app -> success: {:?}", result);
             wrap_json_ok_resp(result)
@@ -5609,8 +5692,8 @@ fn raw_login2_with_unionid_tx(
                     }
                 };
 
-                if r2.is_err() {
-                    return Err(anyhow!(r2.err().unwrap()));
+                if let Err(e) = r2 {
+                    return Err(anyhow!(e));
                 }
 
                 let user_exist_r = match HtyUser::verify_exist_by_union_id(&union_id, conn) {
@@ -5701,10 +5784,14 @@ fn raw_login2_with_unionid_tx(
                 // 注册流程完成
                 let _ = del_from_redis(&in_processing_union_id);
                 debug!("raw_login2_with_unionid() -> return response: {:?}", &token);
+                
+                let app = from_app.clone()
+                    .ok_or_else(|| anyhow::anyhow!("from_app is required"))?;
+                
                 Ok((
                     jwt_encode_token(token)?,
                     login_user,
-                    from_app.clone().unwrap(),
+                    app,
                 ))
             }
         }
@@ -5721,12 +5808,16 @@ fn raw_login2_with_unionid_tx(
             // 补一下老用户或者后关注某一个公众号(`to_app`)没有相关`user_info()`的问题。
             // 新用户且已经关注公众号（to_app）的，在`register()`里面就已经创建好了`user_app_info`.
             task::spawn(async move {
-                let _ = post_login(
-                    &user,
-                    &app,
-                    extract_conn(fetch_db_conn(&db_pool).unwrap()).deref_mut(),
-                )
-                    .await; // todo: deal with error instead of `unwrap`
+                if let Ok(conn) = fetch_db_conn(&db_pool) {
+                    let _ = post_login(
+                        &user,
+                        &app,
+                        extract_conn(conn).deref_mut(),
+                    )
+                        .await;
+                } else {
+                    error!("Failed to get db connection in post_login task");
+                }
             });
 
             Ok(token)
@@ -5859,7 +5950,8 @@ async fn call_refresh_openid(
     debug!("call_refresh_openid -> req_user: {:?}", &req_user);
 
     let client = reqwest::Client::new();
-    let body = serde_json::to_string::<ReqHtyUserWithInfos>(&req_user).unwrap();
+    let body = serde_json::to_string::<ReqHtyUserWithInfos>(&req_user)
+        .map_err(|e| anyhow::anyhow!("Failed to serialize request: {}", e))?;
 
     debug!("call_refresh_openid -> body: {:?}", &body);
 
@@ -5877,7 +5969,7 @@ async fn call_refresh_openid(
     debug!("call_refresh_openid -> resp: {:?}", &resp);
 
     let resp_openid: HtyResponse<String> = resp.json().await?;
-    Ok(resp_openid.d.unwrap())
+    resp_openid.d.ok_or_else(|| anyhow::anyhow!("Response data is missing"))
 }
 
 // must move in conn here because of async
@@ -5886,18 +5978,28 @@ pub async fn refresh_openid(
     State(db_pool): State<Arc<DbState>>,
     Json(req_user): Json<ReqHtyUserWithInfos>,
 ) -> Json<HtyResponse<String>> {
-    let id_user = req_user.hty_id.unwrap();
-    let id_user_app_info = req_user
+    let id_user = match req_user.hty_id.clone() {
+        Some(id) => id,
+        None => {
+            return wrap_json_hty_err::<String>(HtyErr {
+                code: HtyErrCode::WebErr,
+                reason: Some("hty_id is required".into()),
+            });
+        }
+    };
+    let id_user_app_info = match req_user
         .infos
         .clone()
-        // fixme: don't use `unwrap` because it can panic. should use unwrap_else()
-        .unwrap()
-        .get(0)
-        .clone()
-        .unwrap()
-        .id
-        .clone()
-        .unwrap();
+        .and_then(|infos| infos.get(0).cloned())
+        .and_then(|info| info.id.clone()) {
+        Some(id) => id,
+        None => {
+            return wrap_json_hty_err::<String>(HtyErr {
+                code: HtyErrCode::WebErr,
+                reason: Some("user_app_info id is required".into()),
+            });
+        }
+    };
 
     match raw_refresh_openid(&id_user, &id_user_app_info, db_conn, db_pool).await {
         Ok(ok) => wrap_json_ok_resp(ok),
@@ -5922,14 +6024,15 @@ async fn raw_refresh_openid(
         has_openid, !has_openid
     );
 
-    let id_app = user_app_info.app_id.clone().unwrap();
-    let union_id = user.union_id.clone().unwrap();
+    let id_app = user_app_info.app_id.clone()
+        .ok_or_else(|| anyhow::anyhow!("app_id is required"))?;
+    let union_id = user.union_id.clone()
+        .ok_or_else(|| anyhow::anyhow!("union_id is required"))?;
     let mut out_openid = "".to_string();
 
     let the_app = HtyApp::find_by_id(&id_app, extract_conn(fetch_db_conn(&db_pool)?).deref_mut())?;
 
-    if the_app.wx_id.is_none() || the_app.wx_id.clone().unwrap().is_empty() {
-        debug!("refresh_openid() -> NO WX_ID, :::BYPASS:::");
+    if the_app.wx_id.clone().filter(|id| !id.is_empty()).is_none() {
         return Err(anyhow!(HtyErr {
             code: HtyErrCode::NullErr,
             reason: Some("refresh_openid() -> NO WX_ID, :::BYPASS:::".to_string()),
@@ -5937,11 +6040,9 @@ async fn raw_refresh_openid(
     }
 
     if has_openid {
-        out_openid = user_app_info.openid.clone().unwrap();
+        out_openid = user_app_info.openid.clone()
+            .ok_or_else(|| anyhow::anyhow!("openid is required"))?;
     } else {
-        let the_app =
-            HtyApp::find_by_id(&id_app, extract_conn(fetch_db_conn(&db_pool)?).deref_mut())?;
-
         debug!("refresh_openid() openid -> {:?}", the_app);
 
         let _ = refresh_cache_and_get_wx_all_follower_openids(&the_app).await?;
@@ -5991,7 +6092,15 @@ pub async fn upyun_token(_sudoer: HtySudoerTokenHeader, data: String) -> Json<Ht
 }
 
 pub async fn upyun_token2(_sudoer: HtySudoerTokenHeader, Json(payload): Json<UpyunData>) -> Json<HtyResponse<String>> {
-    let data = payload.payload.unwrap();
+    let data = match payload.payload {
+        Some(d) => d,
+        None => {
+            return wrap_json_hty_err::<String>(HtyErr {
+                code: HtyErrCode::WebErr,
+                reason: Some("payload is required".into()),
+            });
+        }
+    };
     let operator = get_upyun_operator().to_owned();
     let pwd = get_upyun_password().to_owned();
     let token = generate_upyun_token(&data, &operator, &pwd);
@@ -6028,7 +6137,7 @@ async fn raw_wx_login(
     // Result<WxSession, reqwest::Error>;
     let params = WxParams {
         code: Some(login.code.clone()),
-        appid: Some(in_app.wx_id.unwrap().clone()),
+        appid: in_app.wx_id.clone(),
         secret: in_app.wx_secret.clone(),
         encrypted_data: None,
         iv: None,
@@ -6195,10 +6304,14 @@ fn raw_login_with_cert(
     let app_domain = (*hty_host).clone();
     let app = HtyApp::find_by_domain(&app_domain, conn)?;
     let req_cert = in_req_cert.clone();
+    let pubkey = app.pubkey.clone()
+        .ok_or_else(|| anyhow::anyhow!("pubkey is required"))?;
+    let encrypted_data = req_cert.encrypted_data.clone()
+        .ok_or_else(|| anyhow::anyhow!("encrypted_data is required"))?;
     match verify(
-        app.clone().pubkey.unwrap(),
-        req_cert.encrypted_data.clone().unwrap(),
-        app.clone().pubkey.unwrap(),
+        pubkey.clone(),
+        encrypted_data,
+        pubkey,
     ) {
         Ok(_result) => {
             let resp_token = HtyToken {
@@ -6275,7 +6388,9 @@ fn raw_get_encrypt_id_with_pubkey(
         }));
     }
 
-    match HtyApp::get_encrypt_app_id(&req_pubkey.pubkey.clone().unwrap(), conn) {
+    let pubkey = req_pubkey.pubkey.clone()
+        .ok_or_else(|| anyhow::anyhow!("pubkey is required"))?;
+    match HtyApp::get_encrypt_app_id(&pubkey, conn) {
         Ok(encrypt_app_id) => Ok(encrypt_app_id),
         Err(_e) => Err(anyhow!(HtyErr {
             code: HtyErrCode::CommonError,
@@ -6373,16 +6488,19 @@ pub async fn raw_wx_identify2(
 ) -> anyhow::Result<Json<HtyResponse<HtyToken>>> {
     let app = HtyApp::find_by_domain(&domain, extract_conn(fetch_db_conn(&db_pool)?).deref_mut());
 
-    if app.is_err() {
-        return Ok(wrap_json_hty_err(HtyErr {
-            code: HtyErrCode::DbErr,
-            reason: Some(app.err().unwrap().to_string()),
-        }));
-    }
+    let app = match app {
+        Ok(a) => a,
+        Err(e) => {
+            return Ok(wrap_json_hty_err(HtyErr {
+                code: HtyErrCode::DbErr,
+                reason: Some(e.to_string()),
+            }));
+        }
+    };
 
     match htyuc_models::wx::identify2(
         &wx_id,
-        &app.unwrap().app_id,
+        &app.app_id,
         extract_conn(fetch_db_conn(&db_pool)?).deref_mut(),
     ) {
         Ok(token) => {
@@ -6459,9 +6577,12 @@ fn raw_unlink_users(req_user_rel: ReqHtyUserRels, conn: &mut PgConnection) -> an
                     reason: Some("to_user_id or from_user_id or rel_type can not be none".into())
                 }));
     }
-    let id_from = req_user_rel.from_user_id.unwrap();
-    let id_to = req_user_rel.to_user_id.unwrap();
-    let type_rel = req_user_rel.rel_type.unwrap();
+    let id_from = req_user_rel.from_user_id.clone()
+        .ok_or_else(|| anyhow::anyhow!("from_user_id is required"))?;
+    let id_to = req_user_rel.to_user_id.clone()
+        .ok_or_else(|| anyhow::anyhow!("to_user_id is required"))?;
+    let type_rel = req_user_rel.rel_type.clone()
+        .ok_or_else(|| anyhow::anyhow!("rel_type is required"))?;
 
     let db_item = HtyUserRels::find_by_all_col(&id_from, &id_to, &type_rel, conn)?;
     let res = HtyUserRels::delete_by_id(&db_item.id, conn);
@@ -6487,17 +6608,26 @@ async fn link_users(conn: db::DbConn, Json(req_user_rel): Json<ReqHtyUserRels>) 
 }
 
 fn raw_link_users(req_user_rel: ReqHtyUserRels, conn: &mut PgConnection) -> anyhow::Result<()> {
-    if req_user_rel.to_user_id.is_none() || req_user_rel.from_user_id.is_none() || req_user_rel.rel_type.is_none() {
-        return Err(anyhow!(HtyErr {
-                    code: HtyErrCode::WebErr,
-                    reason: Some("to_user_id or from_user_id or rel_type can not be none".into())
-                }));
-    }
+    let from_user_id = req_user_rel.from_user_id.clone()
+        .ok_or_else(|| anyhow!(HtyErr {
+            code: HtyErrCode::WebErr,
+            reason: Some("from_user_id is required".into())
+        }))?;
+    let to_user_id = req_user_rel.to_user_id.clone()
+        .ok_or_else(|| anyhow!(HtyErr {
+            code: HtyErrCode::WebErr,
+            reason: Some("to_user_id is required".into())
+        }))?;
+    let rel_type = req_user_rel.rel_type.clone()
+        .ok_or_else(|| anyhow!(HtyErr {
+            code: HtyErrCode::WebErr,
+            reason: Some("rel_type is required".into())
+        }))?;
     let in_item = HtyUserRels {
         id: uuid(),
-        from_user_id: req_user_rel.from_user_id.unwrap(),
-        to_user_id: req_user_rel.to_user_id.unwrap(),
-        rel_type: req_user_rel.rel_type.unwrap(),
+        from_user_id,
+        to_user_id,
+        rel_type,
     };
     let _ = HtyUserRels::create(&in_item, conn)?;
     Ok(())
@@ -6581,12 +6711,11 @@ fn raw_find_group_users_by_group_id(
     if group.users.is_none() {
         return Ok(empty);
     }
-    let users = group.users.clone().unwrap().vals;
-    if users.is_none() {
-        return Ok(empty);
+    if let Some(users_val) = group.users.clone().and_then(|u| u.vals) {
+        Ok(users_val)
+    } else {
+        Ok(empty)
     }
-    let res = users.unwrap();
-    Ok(res)
 }
 
 async fn find_user_groups_by_user_id(
@@ -6621,8 +6750,8 @@ fn raw_find_user_groups_by_user_id(
 
     let some_groups = HtyUserGroup::find_by_app_id_or_users(&id, &app.app_id, conn)?;
 
-    if some_groups.is_some() {
-        let res = some_groups.unwrap().into_iter().map(|group| group.to_req()).collect();
+    if let Some(groups) = some_groups {
+        let res = groups.into_iter().map(|group| group.to_req()).collect();
         Ok(Some(res))
     } else {
         Ok(None)
