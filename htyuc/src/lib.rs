@@ -423,16 +423,28 @@ async fn count_unread_tongzhis_by_user_id_and_role_id(
     let id_user = get_some_from_query_params::<String>("user_id", &params);
     let id_role = get_some_from_query_params::<String>("role_id", &params);
 
-    if id_user.is_none() || id_user.is_none() {
-        return wrap_json_hty_err::<i32>(HtyErr {
-            code: HtyErrCode::WebErr,
-            reason: Some("id_user or id_user or score_val is none".into()),
-        });
-    }
+    let id_user_val = match id_user {
+        Some(val) => val,
+        None => {
+            return wrap_json_hty_err::<i32>(HtyErr {
+                code: HtyErrCode::WebErr,
+                reason: Some("id_user is required".into()),
+            });
+        }
+    };
+    let id_role_val = match id_role {
+        Some(val) => val,
+        None => {
+            return wrap_json_hty_err::<i32>(HtyErr {
+                code: HtyErrCode::WebErr,
+                reason: Some("id_role is required".into()),
+            });
+        }
+    };
 
     match raw_count_unread_tongzhis_by_user_id_and_role_id(
-        &id_user.clone().unwrap(),
-        &id_role.clone().unwrap(),
+        &id_user_val,
+        &id_role_val,
         extract_conn(conn).deref_mut(),
     ) {
         Ok(resp) => {
@@ -469,16 +481,28 @@ async fn clear_all_unread_tongzhis_by_user_id_and_role_id(
         id_role, id_user
     );
 
-    if id_role.is_none() || id_user.is_none() {
-        return wrap_json_hty_err::<i32>(HtyErr {
-            code: HtyErrCode::WebErr,
-            reason: Some("user_id or role_id is none".into()),
-        });
-    }
+    let id_user_val = match id_user {
+        Some(val) => val,
+        None => {
+            return wrap_json_hty_err::<i32>(HtyErr {
+                code: HtyErrCode::WebErr,
+                reason: Some("user_id is required".into()),
+            });
+        }
+    };
+    let id_role_val = match id_role {
+        Some(val) => val,
+        None => {
+            return wrap_json_hty_err::<i32>(HtyErr {
+                code: HtyErrCode::WebErr,
+                reason: Some("role_id is required".into()),
+            });
+        }
+    };
 
     match raw_clear_all_unread_tongzhis_by_user_id_and_role_id(
-        &id_user.clone().unwrap(),
-        &id_role.clone().unwrap(),
+        &id_user_val,
+        &id_role_val,
         extract_conn(conn).deref_mut(),
     ) {
         Ok(resp) => {
@@ -522,17 +546,38 @@ async fn delete_all_tongzhis_by_status_and_role_id_and_user_id(
 
     debug!("delete_all_tongzhis_by_status_and_role_id_and_user_id -> tongzhi_status: {:?} / id_role: {:?} / id_user: {:?}", tongzhi_status, id_role, id_user);
 
-    if tongzhi_status.is_none() || id_role.is_none() || id_user.is_none() {
-        return wrap_json_hty_err::<i32>(HtyErr {
-            code: HtyErrCode::WebErr,
-            reason: Some("status or user_id or role_id is none".into()),
-        });
-    }
+    let tongzhi_status_val = match tongzhi_status {
+        Some(val) => val,
+        None => {
+            return wrap_json_hty_err::<i32>(HtyErr {
+                code: HtyErrCode::WebErr,
+                reason: Some("tongzhi_status is required".into()),
+            });
+        }
+    };
+    let id_role_val = match id_role {
+        Some(val) => val,
+        None => {
+            return wrap_json_hty_err::<i32>(HtyErr {
+                code: HtyErrCode::WebErr,
+                reason: Some("role_id is required".into()),
+            });
+        }
+    };
+    let id_user_val = match id_user {
+        Some(val) => val,
+        None => {
+            return wrap_json_hty_err::<i32>(HtyErr {
+                code: HtyErrCode::WebErr,
+                reason: Some("user_id is required".into()),
+            });
+        }
+    };
 
     match raw_delete_all_tongzhis_by_status_and_role_id_and_user_id(
-        &id_role.clone().unwrap(),
-        &id_user.clone().unwrap(),
-        &tongzhi_status.clone().unwrap(),
+        &id_role_val,
+        &id_user_val,
+        &tongzhi_status_val,
         extract_conn(conn).deref_mut(),
     ) {
         Ok(resp) => {
@@ -996,35 +1041,17 @@ async fn find_all_tongzhis_with_page(
     let mut the_role_id = None;
     let mut the_hty_id = None;
 
-    if params.get("tongzhi_status").is_some() {
+    if let Some(status_str) = params.get("tongzhi_status") {
         // READ / UNREAD
-        the_tongzhi_status = Some(
-            params
-                .get("tongzhi_status")
-                .unwrap()
-                .parse::<String>()
-                .unwrap_or_default(),
-        );
+        the_tongzhi_status = Some(status_str.parse::<String>().unwrap_or_default());
     }
 
-    if params.get("role_id").is_some() {
-        the_role_id = Some(
-            params
-                .get("role_id")
-                .unwrap()
-                .parse::<String>()
-                .unwrap_or_default(),
-        );
+    if let Some(role_id_str) = params.get("role_id") {
+        the_role_id = Some(role_id_str.parse::<String>().unwrap_or_default());
     }
 
-    if params.get("hty_id").is_some() {
-        the_hty_id = Some(
-            params
-                .get("hty_id")
-                .unwrap()
-                .parse::<String>()
-                .unwrap_or_default(),
-        );
+    if let Some(hty_id_str) = params.get("hty_id") {
+        the_hty_id = Some(hty_id_str.parse::<String>().unwrap_or_default());
     }
 
     match raw_find_tongzhis(
@@ -1180,27 +1207,25 @@ async fn create_or_update_tags(
 }
 
 fn raw_create_or_update_tags(req_tag: ReqHtyTag, db_pool: Arc<DbState>) -> anyhow::Result<()> {
-    if !req_tag.tag_id.is_none() {
-        let id_tag = req_tag.tag_id.clone().unwrap();
+    if let Some(id_tag) = req_tag.tag_id.clone() {
         let mut db_tag =
             HtyTag::find_by_tag_id(&id_tag, extract_conn(fetch_db_conn(&db_pool)?).deref_mut())?;
-        if req_tag.tag_name.is_some() {
-            db_tag.tag_name = req_tag.tag_name.clone().unwrap();
+        if let Some(tag_name) = req_tag.tag_name.clone() {
+            db_tag.tag_name = tag_name;
         }
         db_tag.tag_desc = req_tag.tag_desc.clone();
         db_tag.style = req_tag.style.clone();
         let _ = HtyTag::update(&db_tag, extract_conn(fetch_db_conn(&db_pool)?).deref_mut())?;
         return Ok(());
     }
-    if req_tag.tag_name.is_none() {
-        return Err(anyhow!(HtyErr {
+    let tag_name = req_tag.tag_name.clone()
+        .ok_or_else(|| anyhow!(HtyErr {
             code: HtyErrCode::WebErr,
             reason: Some("for create flow, tag_name can not be none".into())
-        }));
-    }
+        }))?;
     let db_tag = HtyTag {
         tag_id: uuid(),
-        tag_name: req_tag.tag_name.clone().unwrap(),
+        tag_name,
         tag_desc: req_tag.tag_desc.clone(),
         style: req_tag.style.clone(),
     };
@@ -1227,17 +1252,21 @@ async fn create_tag_ref(
 }
 
 fn raw_create_tag_ref(req_tag_ref: ReqHtyTagRef, db_pool: Arc<DbState>) -> anyhow::Result<String> {
-    if req_tag_ref.hty_tag_id.is_none()
-        || req_tag_ref.ref_id.is_none()
-        || req_tag_ref.ref_type.is_none()
-    {
-        return Err(anyhow!(HtyErr {
+    let tag_id = req_tag_ref.hty_tag_id.clone()
+        .ok_or_else(|| anyhow!(HtyErr {
             code: HtyErrCode::WebErr,
-            reason: Some("hty_tag_id or ref_id or ref_type is none".into())
-        }));
-    }
-    let tag_id = req_tag_ref.hty_tag_id.clone().unwrap();
-    let ref_id = req_tag_ref.ref_id.clone().unwrap();
+            reason: Some("hty_tag_id is required".into())
+        }))?;
+    let ref_id = req_tag_ref.ref_id.clone()
+        .ok_or_else(|| anyhow!(HtyErr {
+            code: HtyErrCode::WebErr,
+            reason: Some("ref_id is required".into())
+        }))?;
+    let ref_type = req_tag_ref.ref_type.clone()
+        .ok_or_else(|| anyhow!(HtyErr {
+            code: HtyErrCode::WebErr,
+            reason: Some("ref_type is required".into())
+        }))?;
     let duplicate_check = HtyTagRef::verify_exist_by_ref_id_and_tag_id(
         &tag_id,
         &ref_id,
@@ -1251,9 +1280,9 @@ fn raw_create_tag_ref(req_tag_ref: ReqHtyTagRef, db_pool: Arc<DbState>) -> anyho
     }
     let db_tag_ref = HtyTagRef {
         the_id: uuid(),
-        hty_tag_id: req_tag_ref.hty_tag_id.clone().unwrap(),
-        ref_id: req_tag_ref.ref_id.clone().unwrap(),
-        ref_type: req_tag_ref.ref_type.clone().unwrap(),
+        hty_tag_id: tag_id.clone(),
+        ref_id: ref_id.clone(),
+        ref_type: ref_type.clone(),
         meta: req_tag_ref.meta.clone(),
     };
     let res = HtyTagRef::create(
@@ -1285,7 +1314,8 @@ fn raw_find_all_tags(db_pool: Arc<DbState>) -> anyhow::Result<Vec<ReqHtyTag>> {
     let tags = HtyTag::find_all(extract_conn(fetch_db_conn(&db_pool)?).deref_mut())?;
     let req_tags: Vec<ReqHtyTag> = tags.into_iter().map(|tag| tag.to_req()).collect();
     for mut req_tag in req_tags {
-        let id_tag = req_tag.tag_id.clone().unwrap();
+        let id_tag = req_tag.tag_id.clone()
+            .ok_or_else(|| anyhow::anyhow!("tag_id is required"))?;
         let tag_refs = HtyTagRef::find_all_by_tag_id(
             &id_tag,
             extract_conn(fetch_db_conn(&db_pool)?).deref_mut(),
@@ -1471,11 +1501,15 @@ async fn raw_register_verify(
 
     let register_verify_copy = register_verify.clone();
 
-    let in_app = HtyApp::find_by_id(&register_verify.clone().app_id.unwrap(),
+    let app_id = register_verify.app_id.clone()
+        .ok_or_else(|| anyhow::anyhow!("app_id is required"))?;
+    let in_app = HtyApp::find_by_id(&app_id,
                                     extract_conn(fetch_db_conn(&db_pool)?).deref_mut())?;
     debug!("raw_register_verify -> in_app: {:?}", in_app);
-    let user_id = register_verify_copy.hty_id.unwrap();
-    let verified = register_verify_copy.validate.unwrap();
+    let user_id = register_verify_copy.hty_id.clone()
+        .ok_or_else(|| anyhow::anyhow!("hty_id is required"))?;
+    let verified = register_verify_copy.validate.clone()
+        .ok_or_else(|| anyhow::anyhow!("validate is required"))?;
 
     let mut user_info = UserAppInfo::find_by_hty_id_and_app_id(
         &user_id,
@@ -1545,35 +1579,37 @@ async fn raw_register(
 
     let in_unionid = register_info.clone().unionid;
 
-    debug!(
-        "raw_register -> in_unionid -> {:?} / is_none? {:?} / is_empty? {:?}",
-        &in_unionid,
-        &in_unionid.is_none(),
-        &in_unionid.clone().unwrap().trim().is_empty()
-    );
-    if in_unionid.is_none() || in_unionid.clone().unwrap().trim().is_empty() {
-        let msg = format!("注册信息里面没有用户小程序UNIONID / {:?}", &register_info);
-        debug!("raw_register -> NO UNIONID -> {:?}", msg);
-        return Err(anyhow!(HtyErr {
-            code: HtyErrCode::WebErr,
-            reason: Some(msg),
-        }));
-    }
+    let unionid_str = match in_unionid.clone() {
+        Some(u) if !u.trim().is_empty() => u,
+        _ => {
+            let msg = format!("注册信息里面没有用户小程序UNIONID / {:?}", &register_info);
+            debug!("raw_register -> NO UNIONID -> {:?}", msg);
+            return Err(anyhow!(HtyErr {
+                code: HtyErrCode::WebErr,
+                reason: Some(msg),
+            }));
+        }
+    };
 
     let in_openid = register_info.clone().openid;
 
     debug!("raw_register -> in_openid -> {:?}", &in_openid,);
-    if in_openid.is_none() || in_openid.unwrap().trim().is_empty() {
-        let msg = format!("注册信息里面没有用户小程序OPENID / {:?}", &register_info);
-        debug!("raw_register -> NO OPENID -> {:?}", msg);
-        return Err(anyhow!(HtyErr {
-            code: HtyErrCode::WebErr,
-            reason: Some(msg),
-        }));
-    }
+    match in_openid.clone() {
+        Some(o) if !o.trim().is_empty() => {
+            // openid is valid, continue
+        }
+        _ => {
+            let msg = format!("注册信息里面没有用户小程序OPENID / {:?}", &register_info);
+            debug!("raw_register -> NO OPENID -> {:?}", msg);
+            return Err(anyhow!(HtyErr {
+                code: HtyErrCode::WebErr,
+                reason: Some(msg),
+            }));
+        }
+    };
 
     match HtyUser::find_by_union_id(
-        &in_unionid.clone().unwrap(),
+        &unionid_str,
         extract_conn(fetch_db_conn(&db_pool)?).deref_mut(),
     ) {
         Ok(user) => {
@@ -1819,7 +1855,13 @@ fn do_post_registration(to_app_id: &String, user_id: &String) {
                 &req_struct
             );
 
-            let body = serde_json::to_string::<ReqUserIdWithAppId>(&req_struct).unwrap();
+            let body = match serde_json::to_string::<ReqUserIdWithAppId>(&req_struct) {
+                Ok(b) => b,
+                Err(e) => {
+                    error!("Failed to serialize request: {}", e);
+                    return;
+                }
+            };
 
             debug!(
                 "raw_register -> update_official_account_openid -> body: {:?}",
@@ -1906,13 +1948,11 @@ async fn raw_update_hty_gonggao(
     db_pool: Arc<DbState>,
 ) -> anyhow::Result<()> {
     debug!("start raw_update_tongzhi_status_by_id");
-    if req_gonggao.id.is_none() {
-        return Err(anyhow!(HtyErr {
+    let gonggao_id = req_gonggao.id.clone()
+        .ok_or_else(|| anyhow!(HtyErr {
             code: HtyErrCode::WebErr,
-            reason: Some("id is none".into())
-        }));
-    }
-    let gonggao_id = req_gonggao.id.clone().unwrap();
+            reason: Some("id is required".into())
+        }))?;
     let mut gonggao = HtyGongGao::find_by_id(
         &gonggao_id,
         extract_conn(fetch_db_conn(&db_pool)?).deref_mut(),
@@ -1935,8 +1975,24 @@ async fn update_tongzhi_status_by_id(
     debug!("update_tongzhi_status_by_id -> starts");
     debug!("update_tongzhi_status_by_id -> req_body {:?}", &req_body);
 
-    let the_tongzhi_id = req_body.0.tongzhi_id.unwrap();
-    let the_tongzhi_status = req_body.0.tongzhi_status.unwrap();
+    let the_tongzhi_id = match req_body.0.tongzhi_id.clone() {
+        Some(id) => id,
+        None => {
+            return wrap_json_hty_err::<()>(HtyErr {
+                code: HtyErrCode::WebErr,
+                reason: Some("tongzhi_id is required".into()),
+            });
+        }
+    };
+    let the_tongzhi_status = match req_body.0.tongzhi_status.clone() {
+        Some(status) => status,
+        None => {
+            return wrap_json_hty_err::<()>(HtyErr {
+                code: HtyErrCode::WebErr,
+                reason: Some("tongzhi_status is required".into()),
+            });
+        }
+    };
 
     match raw_update_tongzhi_status_by_id(&the_tongzhi_id, &the_tongzhi_status, db_conn, db_pool)
         .await
@@ -2002,13 +2058,16 @@ async fn raw_update_official_account_openid(
     db_pool: Arc<DbState>,
 ) -> anyhow::Result<()> {
     debug!("start raw_update_official_account_openid");
-    let id_user = req_user.hty_id.clone().unwrap();
-    let id_app = req_user.app_id.clone().unwrap();
+    let id_user = req_user.hty_id.clone()
+        .ok_or_else(|| anyhow::anyhow!("hty_id is required"))?;
+    let id_app = req_user.app_id.clone()
+        .ok_or_else(|| anyhow::anyhow!("app_id is required"))?;
 
     let to_app = HtyApp::find_by_id(&id_app, extract_conn(fetch_db_conn(&db_pool)?).deref_mut())?;
     let in_user =
         HtyUser::find_by_hty_id(&id_user, extract_conn(fetch_db_conn(&db_pool)?).deref_mut())?;
-    let id_union = in_user.union_id.clone().unwrap();
+    let id_union = in_user.union_id.clone()
+        .ok_or_else(|| anyhow::anyhow!("union_id is required"))?;
 
     let _ = refresh_cache_and_get_wx_all_follower_openids(&to_app).await?;
 
@@ -2079,7 +2138,8 @@ async fn raw_register_rollback(
     _db_conn: db::DbConn,
     db_pool: Arc<DbState>,
 ) -> anyhow::Result<()> {
-    let hty_id = rollback_info.hty_id.unwrap();
+    let hty_id = rollback_info.hty_id.clone()
+        .ok_or_else(|| anyhow::anyhow!("hty_id is required"))?;
     let infos = rollback_info.infos.clone();
 
     let task_delete = move |_in_params: Option<HashMap<String, ReqHtyRole>>,
@@ -2088,19 +2148,27 @@ async fn raw_register_rollback(
         // let _ = UserInfoRole::delete_by_id(&id3, extract_conn(conn).deref_mut());
         // let _ = UserAppInfo::delete(&id2, extract_conn(conn).deref_mut());
         let _ = HtyUser::delete_by_hty_id(&hty_id, conn)?;
-        for info in infos.clone().unwrap() {
-            let info_id = info.id.clone().unwrap();
-            let roles = info.roles.clone().unwrap();
-            for role in roles {
-                let role_copy = role.clone();
-                let rel = UserInfoRole::find_by_role_id_and_user_info_id(
-                    &role_copy.hty_role_id.unwrap(),
-                    &role_copy.user_app_info_id.unwrap(),
-                    conn,
-                )?;
-                let _ = UserInfoRole::delete_by_id(&rel.the_id, conn);
+        if let Some(infos_vec) = infos.clone() {
+            for info in infos_vec {
+                let info_id = info.id.clone()
+                    .ok_or_else(|| anyhow::anyhow!("info.id is required"))?;
+                let roles = info.roles.clone()
+                    .ok_or_else(|| anyhow::anyhow!("info.roles is required"))?;
+                for role in roles {
+                    let role_copy = role.clone();
+                    let hty_role_id = role_copy.hty_role_id.clone()
+                        .ok_or_else(|| anyhow::anyhow!("hty_role_id is required"))?;
+                    let user_app_info_id = role_copy.user_app_info_id.clone()
+                        .ok_or_else(|| anyhow::anyhow!("user_app_info_id is required"))?;
+                    let rel = UserInfoRole::find_by_role_id_and_user_info_id(
+                        &hty_role_id,
+                        &user_app_info_id,
+                        conn,
+                    )?;
+                    let _ = UserInfoRole::delete_by_id(&rel.the_id, conn);
+                }
+                let _ = UserAppInfo::delete(&info_id, conn);
             }
-            let _ = UserAppInfo::delete(&info_id, conn);
         }
         Ok(())
     };
@@ -2231,8 +2299,10 @@ async fn raw_create_hty_resource(
                         format!("raw_create_hty_resource -> token / #{:?}", token.clone()).as_str(),
                     );
 
+                    let hty_id = token.hty_id.clone()
+                        .ok_or_else(|| anyhow::anyhow!("hty_id is required"))?;
                     match HtyUser::find_by_hty_id(
-                        &token.hty_id.clone().unwrap()[..],
+                        &hty_id[..],
                         extract_conn(fetch_db_conn(&db_pool)?).deref_mut(),
                     ) {
                         Ok(user) => {
@@ -2321,18 +2391,26 @@ fn raw_update_user_group(
     req_user_group: &ReqHtyUserGroup,
     db_pool: Arc<DbState>,
 ) -> anyhow::Result<()> {
-    if req_user_group.app_id.is_none()
-        || req_user_group.group_type.is_none()
-        || req_user_group.group_name.is_none()
-        || req_user_group.id.is_none()
-    {
-        return Err(anyhow!(HtyErr {
+    let id_user_group = req_user_group.id.clone()
+        .ok_or_else(|| anyhow!(HtyErr {
             code: HtyErrCode::WebErr,
-            reason: Some("app_id or group_type or group_name or id is none".into()),
-        }));
-    };
-
-    let id_user_group = req_user_group.id.clone().unwrap();
+            reason: Some("id is required".into()),
+        }))?;
+    let app_id = req_user_group.app_id.clone()
+        .ok_or_else(|| anyhow!(HtyErr {
+            code: HtyErrCode::WebErr,
+            reason: Some("app_id is required".into()),
+        }))?;
+    let group_type = req_user_group.group_type.clone()
+        .ok_or_else(|| anyhow!(HtyErr {
+            code: HtyErrCode::WebErr,
+            reason: Some("group_type is required".into()),
+        }))?;
+    let group_name = req_user_group.group_name.clone()
+        .ok_or_else(|| anyhow!(HtyErr {
+            code: HtyErrCode::WebErr,
+            reason: Some("group_name is required".into()),
+        }))?;
 
     let mut db_user_group = HtyUserGroup::find_by_id(
         &id_user_group,
@@ -2343,9 +2421,9 @@ fn raw_update_user_group(
         db_user_group.users = req_user_group.users.clone();
     }
 
-    db_user_group.group_type = req_user_group.group_type.clone().unwrap();
-    db_user_group.app_id = req_user_group.app_id.clone().unwrap();
-    db_user_group.group_name = req_user_group.group_name.clone().unwrap();
+    db_user_group.group_type = group_type;
+    db_user_group.app_id = app_id;
+    db_user_group.group_name = group_name;
     db_user_group.group_desc = req_user_group.group_desc.clone();
     db_user_group.parent_id = req_user_group.parent_id.clone();
     db_user_group.owners = req_user_group.owners.clone();
@@ -2391,12 +2469,16 @@ fn raw_create_user_group(
     _auth: AuthorizationHeader,
     db_pool: Arc<DbState>,
 ) -> anyhow::Result<String> {
-    if req_user_group.group_type.is_none() || req_user_group.group_name.is_none() {
-        return Err(anyhow!(HtyErr {
+    let group_type = req_user_group.group_type.clone()
+        .ok_or_else(|| anyhow!(HtyErr {
             code: HtyErrCode::WebErr,
-            reason: Some("group_type or group_name is none".into()),
-        }));
-    };
+            reason: Some("group_type is required".into()),
+        }))?;
+    let group_name = req_user_group.group_name.clone()
+        .ok_or_else(|| anyhow!(HtyErr {
+            code: HtyErrCode::WebErr,
+            reason: Some("group_name is required".into()),
+        }))?;
     // let id_user = jwt_decode_token(&(*auth).clone())?.hty_id.unwrap();
     let in_app = get_app_from_host(
         (*host).clone(),
@@ -2405,11 +2487,11 @@ fn raw_create_user_group(
     let in_user_group = HtyUserGroup {
         id: uuid(),
         users: req_user_group.users.clone(),
-        group_type: req_user_group.group_type.clone().unwrap(),
+        group_type,
         created_at: Some(current_local_datetime()),
         created_by: req_user_group.created_by.clone(),
         app_id: in_app.app_id,
-        group_name: req_user_group.group_name.clone().unwrap(),
+        group_name,
         is_delete: false,
         group_desc: req_user_group.group_desc.clone(),
         parent_id: req_user_group.parent_id.clone(),
@@ -2451,22 +2533,20 @@ fn raw_update_template_data(
     req_template_data: &ReqHtyTemplateData<String>,
     db_pool: Arc<DbState>,
 ) -> anyhow::Result<String> {
-    if req_template_data.id.is_none() {
-        return Err(anyhow!(HtyErr {
+    let id_template_data = req_template_data.id.clone()
+        .ok_or_else(|| anyhow!(HtyErr {
             code: HtyErrCode::WebErr,
-            reason: Some("id is none".into()),
-        }));
-    };
-    let id_template_data = req_template_data.id.clone().unwrap();
+            reason: Some("id is required".into()),
+        }))?;
     let mut db_template_data = HtyTemplateData::find_by_id(
         &id_template_data,
         extract_conn(fetch_db_conn(&db_pool)?).deref_mut(),
     )?;
-    if req_template_data.template_id.is_some() {
-        db_template_data.template_id = req_template_data.template_id.clone().unwrap();
+    if let Some(template_id) = req_template_data.template_id.clone() {
+        db_template_data.template_id = template_id;
     }
-    if req_template_data.app_id.is_some() {
-        db_template_data.app_id = req_template_data.app_id.clone().unwrap();
+    if let Some(app_id) = req_template_data.app_id.clone() {
+        db_template_data.app_id = app_id;
     }
     db_template_data.template_val = req_template_data.template_val.clone();
     db_template_data.template_text = req_template_data.template_text.clone();
@@ -2500,19 +2580,17 @@ fn raw_update_template(
     req_template: &ReqHtyTemplate<String>,
     db_pool: Arc<DbState>,
 ) -> anyhow::Result<String> {
-    if req_template.id.is_none() {
-        return Err(anyhow!(HtyErr {
+    let id_template = req_template.id.clone()
+        .ok_or_else(|| anyhow!(HtyErr {
             code: HtyErrCode::WebErr,
-            reason: Some("id is none".into()),
-        }));
-    };
-    let id_template = req_template.id.clone().unwrap();
+            reason: Some("id is required".into()),
+        }))?;
     let mut db_template = HtyTemplate::find_by_id(
         &id_template,
         extract_conn(fetch_db_conn(&db_pool)?).deref_mut(),
     )?;
-    if req_template.template_key.is_some() {
-        db_template.template_key = req_template.template_key.clone().unwrap();
+    if let Some(template_key) = req_template.template_key.clone() {
+        db_template.template_key = template_key;
     }
     db_template.template_desc = req_template.template_desc.clone();
     let _ = HtyTemplate::update(
@@ -2553,17 +2631,23 @@ fn raw_create_template_data(
     auth: AuthorizationHeader,
     db_pool: Arc<DbState>,
 ) -> anyhow::Result<String> {
-    if req_template_data.app_id.is_none() || req_template_data.template_id.is_none() {
-        return Err(anyhow!(HtyErr {
+    let app_id = req_template_data.app_id.clone()
+        .ok_or_else(|| anyhow!(HtyErr {
             code: HtyErrCode::WebErr,
-            reason: Some("app_id or template_id is none".into()),
-        }));
-    };
-    let id_user = jwt_decode_token(&(*auth).clone())?.hty_id.unwrap();
+            reason: Some("app_id is required".into()),
+        }))?;
+    let template_id = req_template_data.template_id.clone()
+        .ok_or_else(|| anyhow!(HtyErr {
+            code: HtyErrCode::WebErr,
+            reason: Some("template_id is required".into()),
+        }))?;
+    let id_user = jwt_decode_token(&(*auth).clone())?
+        .hty_id.clone()
+        .ok_or_else(|| anyhow::anyhow!("hty_id is required"))?;
     let in_template_data = HtyTemplateData {
         id: uuid(),
-        app_id: req_template_data.app_id.clone().unwrap(),
-        template_id: req_template_data.template_id.clone().unwrap(),
+        app_id,
+        template_id,
         template_val: req_template_data.template_val.clone(),
         template_text: req_template_data.template_text.clone(),
         created_at: current_local_datetime(),
@@ -2606,10 +2690,17 @@ fn raw_create_template(
             reason: Some("template_key is none".into()),
         }));
     };
-    let id_user = jwt_decode_token(&(*auth).clone())?.hty_id.unwrap();
+    let id_user = jwt_decode_token(&(*auth).clone())?
+        .hty_id.clone()
+        .ok_or_else(|| anyhow::anyhow!("hty_id is required"))?;
+    let template_key = req_template.template_key.clone()
+        .ok_or_else(|| anyhow!(HtyErr {
+            code: HtyErrCode::WebErr,
+            reason: Some("template_key is required".into()),
+        }))?;
     let in_template = HtyTemplate {
         id: uuid(),
-        template_key: req_template.template_key.clone().unwrap(),
+        template_key,
         created_at: current_local_datetime(),
         created_by: id_user,
         template_desc: req_template.template_desc.clone(),
@@ -2700,7 +2791,9 @@ fn get_all_db_tags_of_the_user(auth: AuthorizationHeader, host: HtyHostHeader, c
     let app = HtyApp::find_by_domain(&domain, conn)?;
     debug!("get_all_db_tags_of_the_user -> app: {:?}", app);
 
-    let id_user = jwt_decode_token(&(*auth).clone())?.hty_id.unwrap();
+    let id_user = jwt_decode_token(&(*auth).clone())?
+        .hty_id.clone()
+        .ok_or_else(|| anyhow::anyhow!("hty_id is required"))?;
     debug!("get_all_db_tags_of_the_user -> id_user: {:?}", id_user);
 
     let user_app_info = UserAppInfo::find_by_hty_id_and_app_id(&id_user, &app.app_id, conn)?;
@@ -2754,7 +2847,9 @@ fn raw_get_user_groups_of_current_user(
     some_is_delete: &Option<bool>,
     db_pool: Arc<DbState>,
 ) -> anyhow::Result<Vec<ReqHtyUserGroup>> {
-    let id_user = jwt_decode_token(&(*auth).clone())?.hty_id.unwrap();
+    let id_user = jwt_decode_token(&(*auth).clone())?
+        .hty_id.clone()
+        .ok_or_else(|| anyhow::anyhow!("hty_id is required"))?;
 
     debug!("raw_get_user_groups_of_current_user -> find_by_created_by_or_users START: {:?}", current_local_datetime());
     let res = HtyUserGroup::find_by_created_by_or_users(
@@ -2984,16 +3079,20 @@ fn raw_create_app_from_to(
     req_from_to: &ReqAppFromTo,
     conn: &mut PgConnection,
 ) -> anyhow::Result<String> {
-    if req_from_to.from_app_id.is_none() || req_from_to.to_app_id.is_none() {
-        return Err(anyhow!(HtyErr {
+    let from_app_id = req_from_to.from_app_id.clone()
+        .ok_or_else(|| anyhow!(HtyErr {
             code: HtyErrCode::WebErr,
-            reason: Some("from_app_id or to_app_id".into()),
-        }));
-    }
+            reason: Some("from_app_id is required".into()),
+        }))?;
+    let to_app_id = req_from_to.to_app_id.clone()
+        .ok_or_else(|| anyhow!(HtyErr {
+            code: HtyErrCode::WebErr,
+            reason: Some("to_app_id is required".into()),
+        }))?;
     let in_from_to = AppFromTo {
         id: uuid(),
-        from_app_id: req_from_to.from_app_id.clone().unwrap(),
-        to_app_id: req_from_to.to_app_id.clone().unwrap(),
+        from_app_id,
+        to_app_id,
         is_enabled: true,
     };
     let res = AppFromTo::create(&in_from_to, conn)?;
@@ -3221,12 +3320,12 @@ fn raw_create_or_update_user_with_info_tx(
             .clone();
         let mut res_user_id = String::new();
         let mut res_user_info_id = String::new();
-        if !some_user.is_none() {
-            if !some_user.clone().unwrap().hty_id.is_none() {
-                let in_user = some_user.unwrap().to_hty_user()?;
+        if let Some(some_user_val) = some_user.clone() {
+            if some_user_val.hty_id.is_some() {
+                let in_user = some_user_val.to_hty_user()?;
                 res_user_id = HtyUser::update(&in_user, conn)?.hty_id;
             } else {
-                let c_user = some_user.clone().unwrap();
+                let c_user = some_user_val;
                 let in_user = HtyUser {
                     hty_id: uuid(),
                     union_id: c_user.union_id,
@@ -3241,12 +3340,12 @@ fn raw_create_or_update_user_with_info_tx(
                 res_user_id = HtyUser::create(&in_user, conn)?.hty_id;
             }
         }
-        if !info.is_none() {
-            if !info.clone().unwrap().id.is_none() {
-                let in_info = info.clone().unwrap().to_user_app_info()?;
+        if let Some(info_val) = info.clone() {
+            if info_val.id.is_some() {
+                let in_info = info_val.to_user_app_info()?;
                 res_user_info_id = UserAppInfo::update(&in_info, conn)?.id;
             } else {
-                let mut tem_hty_id = info.clone().unwrap().hty_id;
+                let mut tem_hty_id = info_val.hty_id.clone();
                 if tem_hty_id.is_none() {
                     if res_user_id.is_empty() {
                         return Err(anyhow!(HtyErr {
@@ -3257,8 +3356,12 @@ fn raw_create_or_update_user_with_info_tx(
                     tem_hty_id = Some(res_user_id.clone());
                 }
 
-                let c_info = info.clone().unwrap();
-                let is_exist = UserAppInfo::verify_exist_by_app_id_and_hty_id(&tem_hty_id.clone().unwrap(), &c_info.app_id.clone().unwrap(), conn)?;
+                let c_info = info_val;
+                let hty_id_val = tem_hty_id.clone()
+                    .ok_or_else(|| anyhow::anyhow!("hty_id is required"))?;
+                let app_id_val = c_info.app_id.clone()
+                    .ok_or_else(|| anyhow::anyhow!("app_id is required"))?;
+                let is_exist = UserAppInfo::verify_exist_by_app_id_and_hty_id(&hty_id_val, &app_id_val, conn)?;
                 if is_exist {
                     return Err(anyhow!(HtyErr {
                             code: HtyErrCode::WebErr,
@@ -3267,8 +3370,8 @@ fn raw_create_or_update_user_with_info_tx(
                 }
 
                 let in_info = UserAppInfo {
-                    hty_id: tem_hty_id.unwrap(),
-                    app_id: c_info.app_id,
+                    hty_id: hty_id_val,
+                    app_id: Some(app_id_val),
                     openid: c_info.openid,
                     is_registered: true,
                     id: uuid(),
@@ -3314,29 +3417,29 @@ fn verify_username(
         return Ok(());
     }
 
-    let id_user;
-    if user.is_none() {
-        id_user = info.clone().unwrap().hty_id;
+    let id_user = if let Some(user_val) = user {
+        user_val.hty_id.clone()
     } else {
-        id_user = user.clone().unwrap().hty_id;
-    }
+        info.as_ref().and_then(|i| i.hty_id.clone())
+    };
 
-    let in_info = info.clone().unwrap();
+    let in_info = info.as_ref()
+        .ok_or_else(|| anyhow::anyhow!("info is required"))?;
     let in_username = in_info.username.clone();
 
-    if !in_username.is_none() {
-        if in_username.clone().unwrap() != "" {
+    if let Some(username) = in_username.clone() {
+        if !username.is_empty() {
             let res =
                 UserAppInfo::verify_unique_username_by_app_id(&in_info.clone(), app_id, conn)?;
             if res {
-                if !id_user.is_none() {
+                if let Some(id_user_val) = id_user.clone() {
                     // 如果和自己重名，则不是问题，此场景适用于update_user的username之时。
                     let my_info = UserAppInfo::find_by_username_and_app_id(
-                        &in_username.clone().unwrap(),
+                        &username,
                         app_id,
                         conn,
                     )?;
-                    if Some(my_info.hty_id) == id_user {
+                    if Some(my_info.hty_id) == Some(id_user_val.clone()) {
                         return Ok(());
                     }
                 } else {
@@ -3344,7 +3447,7 @@ fn verify_username(
                         code: HtyErrCode::InternalErr,
                         reason: Some(format!(
                             "existing username -> {}",
-                            &in_username.clone().unwrap()
+                            &username
                         ))
                     }));
                 }
@@ -3374,7 +3477,9 @@ fn raw_update_needs_refresh_for_app(
     hty_app: &ReqHtyApp,
     conn: &mut PgConnection,
 ) -> anyhow::Result<ReqHtyApp> {
-    let in_app = HtyApp::find_by_id(&hty_app.app_id.clone().unwrap(), conn)?;
+    let app_id = hty_app.app_id.clone()
+        .ok_or_else(|| anyhow::anyhow!("app_id is required"))?;
+    let in_app = HtyApp::find_by_id(&app_id, conn)?;
     let needs_refresh = hty_app.needs_refresh.clone();
 
     let all_infos = in_app.all_user_infos(conn)?;
@@ -3414,12 +3519,11 @@ fn raw_create_or_update_apps_with_roles(
     mut hty_app: ReqHtyApp,
     conn: &mut PgConnection,
 ) -> anyhow::Result<ReqHtyApp> {
-    if hty_app.app_status.is_none() {
-        return Err(anyhow!(HtyErr {
+    let app_status = hty_app.app_status.clone()
+        .ok_or_else(|| anyhow!(HtyErr {
             code: HtyErrCode::NullErr,
-            reason: Some("app_status is none".into()),
-        }));
-    };
+            reason: Some("app_status is required".into()),
+        }))?;
 
     let mut is_new_app = false;
 
@@ -3428,12 +3532,13 @@ fn raw_create_or_update_apps_with_roles(
         is_new_app = true;
     }
 
-    let app_id = hty_app.app_id.clone().unwrap();
+    let app_id = hty_app.app_id.clone()
+        .ok_or_else(|| anyhow::anyhow!("app_id is required"))?;
     let in_app = HtyApp {
         app_id: app_id.clone(),
         wx_secret: hty_app.wx_secret.clone(),
         domain: hty_app.domain.clone(),
-        app_status: hty_app.app_status.clone().unwrap(),
+        app_status,
         app_desc: hty_app.app_desc.clone(),
         pubkey: hty_app.pubkey.clone(),
         privkey: hty_app.privkey.clone(),
@@ -3459,7 +3564,8 @@ fn raw_create_or_update_apps_with_roles(
         // 先删后增
         // todo: 未来可能重构逻辑
         let _ = AppRole::delete_all_by_app_id(&app_id, conn)?;
-        let roles = hty_app.role_ids.clone().unwrap();
+        let roles = hty_app.role_ids.clone()
+            .ok_or_else(|| anyhow::anyhow!("role_ids is required"))?;
         for id_role in roles {
             let entry = AppRole {
                 the_id: uuid(),
@@ -3629,35 +3735,41 @@ fn raw_create_or_update_userinfo_with_roles(
 ) -> anyhow::Result<ReqUserAppInfo> {
     let req_user_app_info = hty_user_app_info.clone();
     let user_app_info = UserAppInfo::find_by_req_info(&req_user_app_info, conn)?;
-    if user_app_info.app_id.is_none() {
-        return Err(anyhow!(HtyErr {
+    let app_id = user_app_info.app_id.clone()
+        .ok_or_else(|| anyhow!(HtyErr {
             code: HtyErrCode::NullErr,
-            reason: Some("app id can not be none".into()),
-        }));
-    }
-    let app_roles: Vec<String> = HtyApp::find_by_id(&user_app_info.app_id.clone().unwrap(), conn)?
+            reason: Some("app id is required".into()),
+        }))?;
+    let app_roles: Vec<String> = HtyApp::find_by_id(&app_id, conn)?
         .find_linked_roles(conn)?
         .iter()
         .map(|role| role.clone().hty_role_id)
         .collect();
-    if req_user_app_info.roles.is_some() {
-        let user_info_roles = req_user_app_info.roles.clone().unwrap();
-        let user_info_role_ids: Vec<String> = user_info_roles
-            .iter()
-            .map(|item| item.hty_role_id.clone().unwrap())
-            .collect();
+    if let Some(user_info_roles) = req_user_app_info.roles.clone() {
+        let mut user_info_role_ids: Vec<String> = Vec::new();
         for user_info_role in user_info_roles.clone() {
-            if !app_roles.contains(&user_info_role.hty_role_id.clone().unwrap()) {
+            let hty_role_id = user_info_role.hty_role_id.clone()
+                .ok_or_else(|| anyhow!(HtyErr {
+                    code: HtyErrCode::InternalErr,
+                    reason: Some("hty_role_id is required".into()),
+                }))?;
+            if !app_roles.contains(&hty_role_id) {
                 return Err(anyhow!(HtyErr {
                     code: HtyErrCode::InternalErr,
                     reason: Some("There exist unsupported role in the request".into()),
                 }));
             }
+            user_info_role_ids.push(hty_role_id.clone());
         }
         for user_info_role in user_info_roles {
+            let hty_role_id = user_info_role.hty_role_id.clone()
+                .ok_or_else(|| anyhow!(HtyErr {
+                    code: HtyErrCode::InternalErr,
+                    reason: Some("hty_role_id is required".into()),
+                }))?;
             match UserInfoRole::verify_exist_by_user_info_id_and_role_id(
                 &user_app_info.id,
-                &user_info_role.hty_role_id.clone().unwrap(),
+                &hty_role_id,
                 conn,
             ) {
                 Ok(true) => continue,
@@ -3665,7 +3777,7 @@ fn raw_create_or_update_userinfo_with_roles(
                     let entry = UserInfoRole {
                         the_id: uuid(),
                         user_info_id: user_app_info.id.clone(),
-                        role_id: user_info_role.hty_role_id.clone().unwrap().clone(),
+                        role_id: hty_role_id,
                     };
                     UserInfoRole::create(&entry, conn)?;
                 }
@@ -3719,10 +3831,15 @@ fn raw_create_or_update_roles(
     db_pool: Arc<DbState>,
 ) -> anyhow::Result<ReqHtyRole> {
     let role = hty_role.clone();
-    if role.labels.is_some() {
-        for label in role.labels.clone().unwrap() {
+    if let Some(labels) = role.labels.clone() {
+        for label in labels {
+            let hty_label_id = label.hty_label_id.clone()
+                .ok_or_else(|| anyhow!(HtyErr {
+                    code: HtyErrCode::NullErr,
+                    reason: Some("hty_label_id is required".into()),
+                }))?;
             match HtyLabel::verify_exist_by_id(
-                &label.hty_label_id.unwrap(),
+                &hty_label_id,
                 extract_conn(fetch_db_conn(&db_pool)?).deref_mut(),
             ) {
                 Ok(true) => continue,
@@ -3735,10 +3852,15 @@ fn raw_create_or_update_roles(
             }
         }
     }
-    if role.actions.is_some() {
-        for action in role.actions.clone().unwrap() {
+    if let Some(actions) = role.actions.clone() {
+        for action in actions {
+            let hty_action_id = action.hty_action_id.clone()
+                .ok_or_else(|| anyhow!(HtyErr {
+                    code: HtyErrCode::NullErr,
+                    reason: Some("hty_action_id is required".into()),
+                }))?;
             match HtyAction::verify_exist_by_id(
-                &action.hty_action_id.unwrap(),
+                &hty_action_id,
                 extract_conn(fetch_db_conn(&db_pool)?).deref_mut(),
             ) {
                 Ok(true) => continue,
@@ -3751,8 +3873,8 @@ fn raw_create_or_update_roles(
             }
         }
     }
-    if role.app_ids.is_some() {
-        for app_id in role.app_ids.clone().unwrap() {
+    if let Some(app_ids) = role.app_ids.clone() {
+        for app_id in app_ids {
             match HtyApp::verify_exist_by_id(
                 &app_id,
                 extract_conn(fetch_db_conn(&db_pool)?).deref_mut(),
@@ -3787,18 +3909,28 @@ fn raw_create_or_update_roles(
                                      conn: &mut PgConnection|
                                      -> anyhow::Result<ReqHtyRole> {
             let mut res_role = role.clone();
+            let role_key = role.role_key.clone()
+                .ok_or_else(|| anyhow!(HtyErr {
+                    code: HtyErrCode::WebErr,
+                    reason: Some("role_key is required".into()),
+                }))?;
+            let role_status = role.role_status.clone()
+                .ok_or_else(|| anyhow!(HtyErr {
+                    code: HtyErrCode::WebErr,
+                    reason: Some("role_status is required".into()),
+                }))?;
             let in_role = HtyRole {
                 hty_role_id: uuid(),
-                role_key: role.role_key.clone().unwrap(),
+                role_key,
                 role_desc: role.role_desc.clone(),
-                role_status: role.role_status.clone().unwrap(),
+                role_status,
                 style: role.style.clone(),
                 role_name: role.role_name.clone(),
             };
             let created_role = HtyRole::create(&in_role, conn)?;
             res_role.hty_role_id = Some(created_role.hty_role_id.clone());
-            if role.app_ids.is_some() {
-                for app in role.app_ids.clone().unwrap() {
+            if let Some(app_ids) = role.app_ids.clone() {
+                for app in app_ids {
                     let in_app = AppRole {
                         the_id: uuid(),
                         role_id: in_role.hty_role_id.clone(),
@@ -3807,22 +3939,32 @@ fn raw_create_or_update_roles(
                     AppRole::create(&in_app, conn)?;
                 }
             }
-            if role.labels.is_some() {
-                for label in role.labels.clone().unwrap() {
+            if let Some(labels) = role.labels.clone() {
+                for label in labels {
+                    let label_id = label.hty_label_id.clone()
+                        .ok_or_else(|| anyhow!(HtyErr {
+                            code: HtyErrCode::WebErr,
+                            reason: Some("hty_label_id is required".into()),
+                        }))?;
                     let in_label = RoleLabel {
                         the_id: uuid(),
                         role_id: in_role.hty_role_id.clone(),
-                        label_id: label.hty_label_id.clone().unwrap(),
+                        label_id,
                     };
                     RoleLabel::create(&in_label, conn)?;
                 }
             }
-            if role.actions.is_some() {
-                for action in role.actions.clone().unwrap() {
+            if let Some(actions) = role.actions.clone() {
+                for action in actions {
+                    let action_id = action.hty_action_id.clone()
+                        .ok_or_else(|| anyhow!(HtyErr {
+                            code: HtyErrCode::WebErr,
+                            reason: Some("hty_action_id is required".into()),
+                        }))?;
                     let in_action = RoleAction {
                         the_id: uuid(),
                         role_id: in_role.hty_role_id.clone(),
-                        action_id: action.hty_action_id.clone().unwrap(),
+                        action_id,
                     };
                     RoleAction::create(&in_action, conn)?;
                 }
@@ -3843,29 +3985,39 @@ fn raw_create_or_update_roles(
     }
 
     // role_id is some, then update existing role
-    if role.hty_role_id.is_some() {
+    if let Some(hty_role_id) = role.hty_role_id.clone() {
         let task_update_role = move |_in_params: Option<HashMap<String, ReqHtyRole>>,
                                      conn: &mut PgConnection|
                                      -> anyhow::Result<ReqHtyRole> {
-            RoleLabel::delete_by_role_id(&role.hty_role_id.clone().unwrap(), conn)?;
-            AppRole::delete_by_role_id(&role.hty_role_id.clone().unwrap(), conn)?;
-            RoleAction::delete_by_role_id(&role.hty_role_id.clone().unwrap(), conn)?;
-            match HtyRole::verify_exist_by_id(&role.hty_role_id.clone().unwrap(), conn) {
+            RoleLabel::delete_by_role_id(&hty_role_id, conn)?;
+            AppRole::delete_by_role_id(&hty_role_id, conn)?;
+            RoleAction::delete_by_role_id(&hty_role_id, conn)?;
+            match HtyRole::verify_exist_by_id(&hty_role_id, conn) {
                 Ok(true) => {
+                    let role_key = role.role_key.clone()
+                        .ok_or_else(|| anyhow!(HtyErr {
+                            code: HtyErrCode::WebErr,
+                            reason: Some("role_key is required".into()),
+                        }))?;
+                    let role_status = role.role_status.clone()
+                        .ok_or_else(|| anyhow!(HtyErr {
+                            code: HtyErrCode::WebErr,
+                            reason: Some("role_status is required".into()),
+                        }))?;
                     let update_role = HtyRole {
-                        hty_role_id: role.hty_role_id.clone().unwrap(),
-                        role_key: role.role_key.clone().unwrap(),
+                        hty_role_id: hty_role_id.clone(),
+                        role_key,
                         role_desc: role.clone().role_desc,
-                        role_status: role.role_status.clone().unwrap(),
+                        role_status,
                         style: role.style.clone(),
                         role_name: role.role_name.clone(),
                     };
                     HtyRole::update(&update_role, conn)?;
-                    if role.app_ids.is_some() {
-                        for app_id in role.app_ids.clone().unwrap() {
+                    if let Some(app_ids) = role.app_ids.clone() {
+                        for app_id in app_ids {
                             match AppRole::verify_exist_by_app_id_and_role_id(
                                 &app_id.clone(),
-                                &role.hty_role_id.clone().unwrap(),
+                                &hty_role_id,
                                 conn,
                             ) {
                                 Ok(true) => continue,
@@ -3873,7 +4025,7 @@ fn raw_create_or_update_roles(
                                     let in_app_role = AppRole {
                                         the_id: uuid(),
                                         app_id: app_id.clone(),
-                                        role_id: role.hty_role_id.clone().unwrap(),
+                                        role_id: hty_role_id.clone(),
                                     };
                                     AppRole::create(&in_app_role, conn)?;
                                 }
@@ -3886,19 +4038,24 @@ fn raw_create_or_update_roles(
                             }
                         }
                     }
-                    if role.labels.is_some() {
-                        for label in role.labels.clone().unwrap() {
+                    if let Some(labels) = role.labels.clone() {
+                        for label in labels {
+                            let label_id = label.hty_label_id.clone()
+                                .ok_or_else(|| anyhow!(HtyErr {
+                                    code: HtyErrCode::WebErr,
+                                    reason: Some("hty_label_id is required".into()),
+                                }))?;
                             match RoleLabel::verify_exist_by_role_id_and_label_id(
-                                &role.hty_role_id.clone().unwrap(),
-                                &label.hty_label_id.clone().unwrap(),
+                                &hty_role_id,
+                                &label_id,
                                 conn,
                             ) {
                                 Ok(true) => continue,
                                 Ok(false) => {
                                     let in_role_label = RoleLabel {
                                         the_id: uuid(),
-                                        role_id: role.hty_role_id.clone().unwrap(),
-                                        label_id: label.hty_label_id.clone().unwrap(),
+                                        role_id: hty_role_id.clone(),
+                                        label_id,
                                     };
                                     RoleLabel::create(&in_role_label, conn)?;
                                 }
@@ -3911,19 +4068,24 @@ fn raw_create_or_update_roles(
                             }
                         }
                     }
-                    if role.actions.is_some() {
-                        for action in role.actions.clone().unwrap() {
+                    if let Some(actions) = role.actions.clone() {
+                        for action in actions {
+                            let action_id = action.hty_action_id.clone()
+                                .ok_or_else(|| anyhow!(HtyErr {
+                                    code: HtyErrCode::WebErr,
+                                    reason: Some("hty_action_id is required".into()),
+                                }))?;
                             match RoleAction::verify_exist_by_role_id_and_action_id(
-                                &role.hty_role_id.clone().unwrap(),
-                                &action.hty_action_id.clone().unwrap(),
+                                &hty_role_id,
+                                &action_id,
                                 conn,
                             ) {
                                 Ok(true) => continue,
                                 Ok(false) => {
                                     let in_role_action = RoleAction {
                                         the_id: uuid(),
-                                        role_id: role.hty_role_id.clone().unwrap(),
-                                        action_id: action.hty_action_id.clone().unwrap(),
+                                        role_id: hty_role_id.clone(),
+                                        action_id,
                                     };
                                     RoleAction::create(&in_role_action, conn)?;
                                 }
