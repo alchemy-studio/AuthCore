@@ -5705,6 +5705,7 @@ pub async fn refresh_openid(
     let id_user_app_info = req_user
         .infos
         .clone()
+        // fixme: don't use `unwrap` because it can panic. should use unwrap_else()
         .unwrap()
         .get(0)
         .clone()
