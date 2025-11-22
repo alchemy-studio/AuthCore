@@ -47,8 +47,7 @@ pub fn pool(db_url: &str) -> PgPool {
     let max_size = env::var("POOL_SIZE")
         .expect("POOL_SIZE must be set")
         .parse::<u32>()
-        .map_err(|e| format!("Failed to parse POOL_SIZE: {}", e))
-        .expect("POOL_SIZE must be a valid number");
+        .unwrap_or_else(|e| panic!("Failed to parse POOL_SIZE: {}", e));
 
     Pool::builder()
         .max_size(max_size)
