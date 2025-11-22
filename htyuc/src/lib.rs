@@ -38,7 +38,7 @@ use htycommons::models::*;
 pub mod ddl;
 pub mod r_uc;
 mod notifications;
-pub mod test_scaffold;
+
 
 // pub mod wx;
 
