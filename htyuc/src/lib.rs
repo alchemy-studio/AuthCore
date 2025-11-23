@@ -683,9 +683,7 @@ async fn find_user_by_phone(
         }
     };
 
-    let app = get_some_from_query_params::<String>("app", &params);
-
-    match raw_find_user_by_phone(&phone, app, host, extract_conn(conn).deref_mut()) {
+    match raw_find_user_by_phone(&phone, host, extract_conn(conn).deref_mut()) {
         Ok(resp) => {
             debug!("find_user_by_phone -> success: {:?}", resp);
             wrap_json_ok_resp(resp)
@@ -699,7 +697,6 @@ async fn find_user_by_phone(
 
 fn raw_find_user_by_phone(
     phone: &String,
-    app: Option<String>,
     host: HtyHostHeader,
     conn: &mut PgConnection,
 ) -> anyhow::Result<Option<RespUserStatusByPhone>> {
@@ -711,14 +708,7 @@ fn raw_find_user_by_phone(
         app_from_host
     );
 
-    let target_app = match app {
-        Some(ref app_id)
-            if !app_id.is_empty() && app_id.as_str() != app_from_host.app_id.as_str() =>
-        {
-            HtyApp::find_by_id(app_id, conn)?
-        }
-        _ => app_from_host,
-    };
+    let target_app = app_from_host;
 
     debug!("raw_find_user_by_phone -> target_app: {:?}", target_app);
 
