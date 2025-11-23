@@ -322,6 +322,26 @@ impl HtyUser {
         }
     }
 
+    pub fn find_by_mobile(
+        in_mobile: &str,
+        conn: &mut PgConnection,
+    ) -> anyhow::Result<Option<HtyUser>> {
+        debug!("find_by_mobile -> mobile: {:?}", in_mobile);
+
+        if in_mobile.is_empty() {
+            return Err(anyhow!(HtyErr {
+                code: HtyErrCode::DbErr,
+                reason: Some("find_by_mobile -> `mobile` can't be NULL!".to_string()),
+            }));
+        }
+
+        use crate::schema::hty_users::dsl::*;
+        Ok(hty_users
+            .filter(mobile.eq(in_mobile))
+            .first::<HtyUser>(conn)
+            .optional()?)
+    }
+
     pub fn find_by_hty_id(id_hty: &str, conn: &mut PgConnection) -> anyhow::Result<HtyUser> {
         debug!("find_by_hty_id -> id_hty: {:?}", id_hty);
 
@@ -933,6 +953,12 @@ pub struct UserAppInfo {
     pub avatar_url: Option<String>,
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct RespUserStatusByPhone {
+    pub enabled: bool,
+    pub is_registered: bool,
+}
+
 #[derive(AsExpression, FromSqlRow, Debug, Default, Serialize, Deserialize, PartialEq, Clone)]
 #[diesel(sql_type = Jsonb)]
 pub struct TeacherInfo {
@@ -1231,6 +1257,34 @@ impl UserAppInfo {
                 }))
             }
         }
+    }
+
+    pub fn find_opt_by_hty_id_and_app_id(
+        in_hty_id: &str,
+        in_app_id: &str,
+        conn: &mut PgConnection,
+    ) -> anyhow::Result<Option<UserAppInfo>> {
+        debug!(
+            "find_opt_by_hty_id_and_app_id -> hty_id / {:?} / app_id / {:?}",
+            in_hty_id, in_app_id
+        );
+
+        if in_hty_id.is_empty() || in_app_id.is_empty() {
+            return Err(anyhow!(HtyErr {
+                code: HtyErrCode::DbErr,
+                reason: Some(
+                    "find_opt_by_hty_id_and_app_id -> `hty_id` or `app_id` can't be NULL!"
+                        .to_string(),
+                ),
+            }));
+        }
+
+        use crate::schema::user_app_info::dsl::*;
+
+        Ok(user_app_info
+            .filter(hty_id.eq(in_hty_id).and(app_id.eq(in_app_id)))
+            .first::<UserAppInfo>(conn)
+            .optional()?)
     }
 
     pub fn find_hty_user_by_openid(
