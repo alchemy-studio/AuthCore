@@ -667,6 +667,7 @@ fn raw_find_users(
 }
 
 async fn find_user_by_phone(
+    _sudoer: HtySudoerTokenHeader,
     host: HtyHostHeader,
     Query(params): Query<HashMap<String, String>>,
     conn: db::DbConn,
