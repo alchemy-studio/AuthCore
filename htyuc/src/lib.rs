@@ -666,6 +666,87 @@ fn raw_find_users(
     Ok((resp_users_with_info, total_page, total))
 }
 
+async fn find_user_by_phone(
+    host: HtyHostHeader,
+    Query(params): Query<HashMap<String, String>>,
+    conn: db::DbConn,
+) -> Json<HtyResponse<Option<RespUserStatusByPhone>>> {
+    debug!("find_user_by_phone -> starts / params: {:?}", params);
+
+    let phone = match get_some_from_query_params::<String>("phone", &params) {
+        Some(p) => p,
+        None => {
+            return wrap_json_hty_err::<Option<RespUserStatusByPhone>>(HtyErr {
+                code: HtyErrCode::WebErr,
+                reason: Some("phone is required".into()),
+            })
+        }
+    };
+
+    let app = get_some_from_query_params::<String>("app", &params);
+
+    match raw_find_user_by_phone(&phone, app, host, extract_conn(conn).deref_mut()) {
+        Ok(resp) => {
+            debug!("find_user_by_phone -> success: {:?}", resp);
+            wrap_json_ok_resp(resp)
+        }
+        Err(e) => {
+            error!("find_user_by_phone -> failed: {:?}", e);
+            wrap_json_anyhow_err(e)
+        }
+    }
+}
+
+fn raw_find_user_by_phone(
+    phone: &String,
+    app: Option<String>,
+    host: HtyHostHeader,
+    conn: &mut PgConnection,
+) -> anyhow::Result<Option<RespUserStatusByPhone>> {
+    debug!("raw_find_user_by_phone -> phone: {:?}", phone);
+
+    let app_from_host = get_app_from_host((*host).clone(), conn)?;
+    debug!(
+        "raw_find_user_by_phone -> app_from_host: {:?}",
+        app_from_host
+    );
+
+    let target_app = match app {
+        Some(ref app_id)
+            if !app_id.is_empty() && app_id.as_str() != app_from_host.app_id.as_str() =>
+        {
+            HtyApp::find_by_id(app_id, conn)?
+        }
+        _ => app_from_host,
+    };
+
+    debug!("raw_find_user_by_phone -> target_app: {:?}", target_app);
+
+    let maybe_user = HtyUser::find_by_mobile(phone.as_str(), conn)?;
+
+    let Some(user) = maybe_user else {
+        return Ok(None);
+    };
+
+    debug!("raw_find_user_by_phone -> user: {:?}", user);
+
+    let user_app_info =
+        UserAppInfo::find_opt_by_hty_id_and_app_id(&user.hty_id, &target_app.app_id, conn)?;
+
+    debug!(
+        "raw_find_user_by_phone -> user_app_info: {:?}",
+        user_app_info
+    );
+
+    let resp = RespUserStatusByPhone {
+        enabled: user.enabled,
+        is_registered: user_app_info
+            .map(|info| info.is_registered)
+            .unwrap_or(false),
+    };
+
+    Ok(Some(resp))
+}
 
 // find_hty_users by keyword with out user_info data
 async fn find_hty_users_by_keyword(
@@ -6905,8 +6986,15 @@ pub fn uc_rocket(db_url: &str) -> Router {
         .route("/api/v1/uc/find_all_tags", get(find_all_tags))
         .route("/api/v1/uc/find_all_user_rels_by_params", get(find_all_user_rels_by_params))
         .route("/api/v1/uc/find_users", get(find_users))
-        .route("/api/v1/uc/find_hty_users_by_keyword", get(find_hty_users_by_keyword))
-        .route("/api/v1/uc/verify_user_enabled_and_registered_in_app", get(verify_user_enabled_and_registered_in_app))
+        .route("/api/v1/uc/findUserByPhone", get(find_user_by_phone))
+        .route(
+            "/api/v1/uc/find_hty_users_by_keyword",
+            get(find_hty_users_by_keyword),
+        )
+        .route(
+            "/api/v1/uc/verify_user_enabled_and_registered_in_app",
+            get(verify_user_enabled_and_registered_in_app),
+        )
         .route("/api/v1/uc/find_tongzhis", get(find_tongzhis))
         .route("/api/v1/uc/find_all_tongzhis_with_page", get(find_all_tongzhis_with_page))
         .route(
