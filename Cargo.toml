@@ -50,7 +50,7 @@ tracing = { version = "^0.1" }
 tracing-appender = "^0.2"
 tracing-subscriber = { version = "^0.3", features = ["env-filter", "local-time"] }
 url = "^2.5"
-uuid = { version = "^1.18", features = ["serde", "v4"] }
+uuid = { version = "^1.19", features = ["serde", "v4"] }
 string-builder = "*"
 
 #[patch.crates-io]
