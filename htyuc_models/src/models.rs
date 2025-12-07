@@ -322,6 +322,26 @@ impl HtyUser {
         }
     }
 
+    pub fn find_opt_by_union_id(
+        id_union: &str,
+        conn: &mut PgConnection,
+    ) -> anyhow::Result<Option<HtyUser>> {
+        debug!("find_opt_by_union_id -> id_union: {:?}", id_union);
+
+        if id_union.is_empty() {
+            return Err(anyhow!(HtyErr {
+                code: HtyErrCode::DbErr,
+                reason: Some("find_opt_by_union_id -> `id_union` can't be NULL!".to_string()),
+            }));
+        }
+
+        use crate::schema::hty_users::dsl::*;
+        Ok(hty_users
+            .filter(union_id.eq(id_union))
+            .first::<HtyUser>(conn)
+            .optional()?)
+    }
+
     pub fn find_by_mobile(
         in_mobile: &str,
         conn: &mut PgConnection,
