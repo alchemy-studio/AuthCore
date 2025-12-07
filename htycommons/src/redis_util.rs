@@ -1,7 +1,7 @@
 use crate::jwt::{jwt_encode_token, jwt_decode_token};
 use crate::remove_quote;
 use anyhow::anyhow;
-use redis::*;
+use redis::{Client, Commands};
 use std::env;
 use log::{error, debug};
 use crate::web::HtyToken;
@@ -84,7 +84,7 @@ pub fn save_kv_to_redis(key: &String, value: &String) -> anyhow::Result<()> {
     match Client::open(redis_url.clone()) {
         Ok(cli) => match cli.get_connection() {
             Ok(mut redis_connect) => {
-                match redis_connect.set(prefix_key, value)
+                match Commands::set(&mut redis_connect, prefix_key, value)
                 {
                     Ok(()) => {
                         debug!("save token successfully -> {:?} / {:?}", key, value);
@@ -92,7 +92,7 @@ pub fn save_kv_to_redis(key: &String, value: &String) -> anyhow::Result<()> {
                     }
                     Err(e) => {
                         error!("Failed to save token -> {:?} / {:?} / {:?}", key, value, e);
-                        Err(anyhow!(e))
+                        Err(anyhow!("Redis error: {:?}", e))
                     }
                 }
             }
@@ -118,7 +118,7 @@ pub fn save_kv_to_redis_with_exp_secs(key: &String, value: &String, expiration_s
     match Client::open(redis_url.clone()) {
         Ok(cli) => match cli.get_connection() {
             Ok(mut redis_connect) => {
-                match redis_connect.set_ex(prefix_key, value, expiration_sec as u64)
+                match Commands::set_ex(&mut redis_connect, prefix_key, value, expiration_sec as u64)
                 {
                     Ok(()) => {
                         debug!("save token with expiration date successfully");
@@ -126,7 +126,7 @@ pub fn save_kv_to_redis_with_exp_secs(key: &String, value: &String, expiration_s
                     }
                     Err(e) => {
                         error!("Failed to save token with expiration -> {:?}", e);
-                        Err(anyhow!(e))
+                        Err(anyhow!("Redis error: {:?}", e))
                     }
                 }
             }
@@ -155,7 +155,7 @@ pub fn get_value_from_redis(key: &String) -> anyhow::Result<String> {
     debug!("get_value_from_redis() -> key / {:?}", &prefix_key);
     let redis_url = get_redis_url()?;
     let mut redis_conn = Client::open(redis_url.clone())?.get_connection()?;
-    let value = redis_conn.get(prefix_key)?;
+    let value: String = Commands::get(&mut redis_conn, prefix_key)?;
     debug!("get_value_from_redis() -> token : {:?}", value);
     Ok(value)
 }
@@ -166,7 +166,7 @@ pub fn get_opt_value_from_redis(key: &String) -> anyhow::Result<Option<String>> 
     debug!("get_value_from_redis2() -> key / {:?}", &prefix_key);
     let redis_url = get_redis_url()?;
     let mut redis_conn = Client::open(redis_url.clone())?.get_connection()?;
-    let value = redis_conn.get(prefix_key)?;
+    let value: Option<String> = Commands::get(&mut redis_conn, prefix_key)?;
     debug!("get_value_from_redis2() -> token : {:?}", value);
     Ok(value)
 }
@@ -179,7 +179,7 @@ pub fn is_key_exist_in_redis(key: &String) -> anyhow::Result<bool> {
 
     let mut redis_conn = Client::open(redis_url.clone())?.get_connection()?;
 
-    let exist = redis_conn.exists(prefix_key)?;
+    let exist: bool = Commands::exists(&mut redis_conn, prefix_key)?;
 
     Ok(exist)
 }
@@ -231,11 +231,11 @@ pub fn del_from_redis(key: &String) -> anyhow::Result<String> {
 
     let mut redis_conn = Client::open(redis_url.clone())?.get_connection()?;
 
-    let r = redis_conn.del(prefix_key)?;
+    let r: i64 = Commands::del(&mut redis_conn, prefix_key)?;
 
     debug!("del_from_redis() -> result : {:?}", r);
 
-    Ok(r)
+    Ok(r.to_string())
 }
 
 
@@ -250,9 +250,9 @@ pub fn del_some_from_redis(key: &String) -> anyhow::Result<Option<()>> {
 
     let mut redis_conn = Client::open(redis_url.clone())?.get_connection()?;
 
-    let r: () = redis_conn.del(prefix_key)?;
+    Commands::del::<_, ()>(&mut redis_conn, prefix_key)?;
 
-    debug!("del_some_from_redis() -> result : {:?}", r);
+    debug!("del_some_from_redis() -> result : Ok");
 
     Ok(Some(()))
 }

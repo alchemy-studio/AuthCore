@@ -79,7 +79,11 @@ pub fn verify(public_key_string: String, encrypted_text: String, verify_text: St
         signature::UnparsedPublicKey::new(&signature::ED25519,
                                           hex::decode(public_key_string).expect("Decoding failed"));
     debug!("::verify_cert:: verifying...");
-    public_key.verify(verify_text.as_bytes(), hex::decode(encrypted_text)?.as_ref())?;
+    public_key.verify(verify_text.as_bytes(), hex::decode(encrypted_text)?.as_ref())
+        .map_err(|e| anyhow!(HtyErr {
+            code: HtyErrCode::NullErr,
+            reason: Some(format!("Verification failed: {:?}", e)),
+        }))?;
     debug!("::verify_cert:: Ok.");
     Ok(true)
 }
