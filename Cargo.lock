@@ -558,9 +558,9 @@ checksum = "3c877555693c14d2f84191cfd3ad8582790fc52b5e2274b40b59cf5f5cea25c7"
 
 [[package]]
 name = "diesel"
-version = "2.3.4"
+version = "2.3.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0c415189028b232660655e4893e8bc25ca7aee8e96888db66d9edb400535456a"
+checksum = "e130c806dccc85428c564f2dc5a96e05b6615a27c9a28776bd7761a9af4bb552"
 dependencies = [
  "bitflags",
  "byteorder",
