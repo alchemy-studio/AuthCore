@@ -200,13 +200,13 @@ pub async fn fn_refresh_cache_and_get_wx_all_follower_openids<T: Send + Clone + 
     let url = "https://api.weixin.qq.com/cgi-bin/user/get";
 
     let client = reqwest::Client::new();
-    let resp = client
+    let resp: reqwest::Response = client
         .get(url)
         .query(&[("access_token", token.as_str()), ("next_openid", "")])
         .send().await?;
 
-    if resp.status().as_str() == "200" {
-        let resp_body = resp.text().await?;
+    if resp.status().as_u16() == 200 {
+        let resp_body: String = resp.text().await?;
         let req_followers = serde_json::from_str::<ReqWxAllFollowers>(
             resp_body.as_str(),
         )?;
@@ -246,14 +246,14 @@ pub async fn fn_refresh_and_get_wx_follower_info<T: Send + Clone + Serialize + D
     let openid_str = openid
         .ok_or_else(|| anyhow::anyhow!("openid is required"))?;
     let client = reqwest::Client::new();
-    let resp = client
+    let resp: reqwest::Response = client
         .get(url)
         .query(&[("access_token", token.as_str()), ("openid", openid_str.as_str())])
         .send()
         .await?;
 
-    if resp.status().as_str() == "200" {
-        let resp_body = resp.text().await?;
+    if resp.status().as_u16() == 200 {
+        let resp_body: String = resp.text().await?;
         let json_follower_info = resp_body.clone();
         let req_follower_info = serde_json::from_str::<ReqWxFollowerInfo>(
             json_follower_info.as_str()
@@ -427,13 +427,13 @@ pub async fn fn_push_wx_message<T: Send + Clone + Serialize + Debug>(
 
     let client = reqwest::Client::new();
 
-    let resp = client
-        .post(wx_url)
-        .query(&[("access_token", token.as_str())])
+    let url_with_token = format!("{}?access_token={}", wx_url, token);
+    let resp: reqwest::Response = client
+        .post(&url_with_token)
         .body(post_body)
         .send().await?;
 
-    let resp_body = resp.text().await?;
+    let resp_body: String = resp.text().await?;
     debug!("fn_push_wx_message() -> wx response body {:?} ", resp_body);
 
     let wx_push_resp = serde_json::from_str::<ReqWxPushResponse>(
