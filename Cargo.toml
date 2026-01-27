@@ -35,7 +35,7 @@ log4rs = "^1.4"
 quote = "=1.0.23" # required by diesel currently
 rand = "^0.9"
 redis = "^1.0"
-reqwest = { version = "^0.13", features = ["blocking", "json"] }
+reqwest = { version = "^0.13", features = ["blocking", "json", "query"] }
 ring = "^0.17"
 rust-crypto = "*"
 serde = { version = "^1.0", features = ["derive"] }
@@ -49,4 +49,4 @@ tracing = { version = "^0.1" }
 tracing-appender = "^0.2"
 tracing-subscriber = { version = "^0.3", features = ["env-filter", "local-time"] }
 url = "^2.5"
-uuid = { version = "^1.18", features = ["serde", "v4"] }
+uuid = { version = "^1.20", features = ["serde", "v4"] }
