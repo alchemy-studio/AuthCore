@@ -8,7 +8,7 @@ use diesel::expression_methods::PgTextExpressionMethods;
 use diesel::pg::{Pg, PgValue};
 // use diesel::serialize::IsNull;
 use diesel::sql_types::Jsonb;
-use diesel::{insert_into, select, sql_query, update, BelongingToDsl, BoolExpressionMethods, EqAll, ExpressionMethods, PgConnection, QueryDsl, RunQueryDsl, TextExpressionMethods, OptionalExtension};
+use diesel::{insert_into, select, sql_query, update, BelongingToDsl, BoolExpressionMethods, Connection, EqAll, ExpressionMethods, PgConnection, QueryDsl, RunQueryDsl, TextExpressionMethods, OptionalExtension};
 use htycommons::cert::encrypt_text_with_private_key;
 use std::io::Write;
 // use htycommons::pagination::LoadPaginated;
@@ -342,6 +342,59 @@ impl HtyUser {
             .optional()?)
     }
 
+    pub fn find_or_create_disabled_by_union_id(
+        id_union: &str,
+        conn: &mut PgConnection,
+    ) -> anyhow::Result<(HtyUser, bool)> {
+        debug!(
+            "find_or_create_disabled_by_union_id -> id_union: {:?}",
+            id_union
+        );
+
+        if id_union.is_empty() {
+            return Err(anyhow!(HtyErr {
+                code: HtyErrCode::DbErr,
+                reason: Some(
+                    "find_or_create_disabled_by_union_id -> `id_union` can't be NULL!".to_string()
+                ),
+            }));
+        }
+
+        conn.transaction::<(HtyUser, bool), anyhow::Error, _>(|conn| {
+            // Avoid duplicate user creation under concurrency.
+            sql_query("SELECT pg_advisory_xact_lock(hashtext($1))")
+                .bind::<diesel::sql_types::Text, _>(id_union)
+                .execute(conn)?;
+
+            if let Some(existing) = HtyUser::find_opt_by_union_id(id_union, conn)? {
+                return Ok((existing, false));
+            }
+
+            let to_create_user = HtyUser {
+                hty_id: uuid(),
+                union_id: Some(id_union.to_string()),
+                enabled: false,
+                created_at: Some(current_local_datetime()),
+                real_name: None,
+                sex: None,
+                mobile: None,
+                settings: None,
+            };
+
+            match HtyUser::create(&to_create_user, conn) {
+                Ok(created) => Ok((created, true)),
+                Err(e) => {
+                    if is_unique_violation_err(&e) {
+                        if let Some(existing) = HtyUser::find_opt_by_union_id(id_union, conn)? {
+                            return Ok((existing, false));
+                        }
+                    }
+                    Err(e)
+                }
+            }
+        })
+    }
+
     pub fn find_by_mobile(
         in_mobile: &str,
         conn: &mut PgConnection,
@@ -613,6 +666,20 @@ impl HtyUser {
     pub fn info(&self, app_id: &String, conn: &mut PgConnection) -> anyhow::Result<UserAppInfo> {
         UserAppInfo::find_by_hty_id_and_app_id(&self.hty_id, app_id, conn)
     }
+}
+
+fn is_unique_violation_err(err: &anyhow::Error) -> bool {
+    if let Some(hty_err) = err.downcast_ref::<HtyErr>() {
+        if hty_err.code == HtyErrCode::DbErr {
+            if let Some(reason) = &hty_err.reason {
+                let reason_lower = reason.to_lowercase();
+                return reason_lower.contains("duplicate key")
+                    || reason_lower.contains("unique constraint")
+                    || reason_lower.contains("unique violation");
+            }
+        }
+    }
+    false
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -4548,4 +4615,3 @@ pub struct ReqHtyUserRels {
 
 
 // deprecated, use `CommonTask` instead.
-
