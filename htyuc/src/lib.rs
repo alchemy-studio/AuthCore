@@ -5642,7 +5642,10 @@ async fn raw_wx_qr_login(code: String, app_domain: String, db_pool: Arc<DbState>
 
     debug!("raw_wx_qr_login -> union_id: {:?}", &union_id);
 
-    let user = HtyUser::find_by_union_id(&union_id, extract_conn(fetch_db_conn(&db_pool)?).deref_mut())?;
+    let (user, _) = HtyUser::find_or_create_disabled_by_union_id(
+        &union_id,
+        extract_conn(fetch_db_conn(&db_pool)?).deref_mut(),
+    )?;
 
     // 第一次登录则不存在本app对应的user_app_info
     let user_is_exist_in_this_app = UserAppInfo::verify_exist_by_app_id_and_hty_id(&user.hty_id, &app.app_id, extract_conn(fetch_db_conn(&db_pool)?).deref_mut())?;
@@ -5674,7 +5677,6 @@ async fn raw_wx_qr_login(code: String, app_domain: String, db_pool: Arc<DbState>
         this_app_user_info = UserAppInfo::create(&create_user_info, extract_conn(fetch_db_conn(&db_pool)?).deref_mut())?;
     } else {
         this_app_user_info = UserAppInfo::find_by_hty_id_and_app_id(&user.hty_id, &app.app_id, extract_conn(fetch_db_conn(&db_pool)?).deref_mut())?;
-
         if !this_app_user_info.is_registered {
             return Err(anyhow!("User is not registered in this app!"));
         }
