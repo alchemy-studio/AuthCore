@@ -33,7 +33,7 @@ jsonwebtoken = { version = "^10.2", features = ["rust_crypto"] }
 log = "^0.4"
 log4rs = "^1.4"
 quote = "=1.0.23" # required by diesel currently
-rand = "^0.9"
+rand = "^0.10"
 redis = "^1.0"
 reqwest = { version = "^0.13", features = ["blocking", "json", "query"] }
 ring = "^0.17"

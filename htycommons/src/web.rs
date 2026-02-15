@@ -9,7 +9,7 @@ use axum::Json;
 use axum::Router;
 use chrono::NaiveDateTime;
 use log::debug;
-use rand::Rng;
+use rand::RngExt;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use std::env;
