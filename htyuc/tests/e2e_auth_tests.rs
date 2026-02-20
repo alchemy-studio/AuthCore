@@ -354,24 +354,13 @@ async fn test_sudo2_to_self_after_login() {
 
     let token = login_response["d"].as_str().unwrap();
 
-    let decoded = htycommons::jwt::jwt_decode_token(&token.to_string());
-    if decoded.is_err() {
-        println!("Token decode failed: {:?}", decoded);
-        return;
-    }
-
-    let hty_token = decoded.unwrap();
-    let hty_id = match hty_token.hty_id {
-        Some(id) => id,
-        None => {
-            println!("No hty_id in token");
-            return;
-        }
-    };
+    // sudo2 requires user_app_info.id, not hty_id
+    // Use the known test data user_app_info id
+    let user_app_info_id = "root-user-app-info-id";
 
     let (sudo2_status, sudo2_response) = app
         .get(
-            &format!("/api/v1/uc/sudo2/{}", hty_id),
+            &format!("/api/v1/uc/sudo2/{}", user_app_info_id),
             vec![
                 ("Authorization", token),
                 ("HtyHost", "root"),
@@ -379,8 +368,8 @@ async fn test_sudo2_to_self_after_login() {
         )
         .await;
 
-    assert_eq!(sudo2_status, StatusCode::OK, "Sudo2 to self should succeed");
-    assert!(sudo2_response["r"].as_bool().unwrap_or(false), "Response should indicate success");
+    assert_eq!(sudo2_status, StatusCode::OK, "Sudo2 to self should succeed. Response: {:?}", sudo2_response);
+    assert!(sudo2_response["r"].as_bool().unwrap_or(false), "Response should indicate success. Response: {:?}", sudo2_response);
 }
 
 // ============================================================================
@@ -438,7 +427,7 @@ async fn test_verify_jwt_token_after_login() {
         .post_json(
             "/api/v1/uc/verify_jwt_token",
             &verify_body.to_string(),
-            vec![],
+            vec![("HtyHost", "root")],
         )
         .await;
 
