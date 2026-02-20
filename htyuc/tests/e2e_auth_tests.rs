@@ -380,15 +380,15 @@ async fn test_sudo2_to_self_after_login() {
 async fn test_verify_jwt_token_invalid() {
     let app = setup();
 
-    let body = json!({
-        "token": "invalid_token"
-    });
-
+    // verify_jwt_token reads token from Authorization header, not body
     let (_status, response) = app
         .post_json(
             "/api/v1/uc/verify_jwt_token",
-            &body.to_string(),
-            vec![("HtyHost", "root")],
+            "{}",
+            vec![
+                ("HtyHost", "root"),
+                ("Authorization", "invalid_token"),
+            ],
         )
         .await;
 
@@ -419,20 +419,20 @@ async fn test_verify_jwt_token_after_login() {
 
     let token = login_response["d"].as_str().unwrap();
 
-    let verify_body = json!({
-        "token": token
-    });
-
+    // verify_jwt_token reads token from Authorization header, not body
     let (verify_status, verify_response) = app
         .post_json(
             "/api/v1/uc/verify_jwt_token",
-            &verify_body.to_string(),
-            vec![("HtyHost", "root")],
+            "{}",
+            vec![
+                ("HtyHost", "root"),
+                ("Authorization", token),
+            ],
         )
         .await;
 
-    assert_eq!(verify_status, StatusCode::OK, "Token verification should succeed");
-    assert!(verify_response["r"].as_bool().unwrap_or(false), "Response should indicate success");
+    assert_eq!(verify_status, StatusCode::OK, "Token verification should succeed. Response: {:?}", verify_response);
+    assert!(verify_response["r"].as_bool().unwrap_or(false), "Response should indicate success. Response: {:?}", verify_response);
 }
 
 // ============================================================================
