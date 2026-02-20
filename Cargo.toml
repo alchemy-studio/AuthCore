@@ -50,3 +50,6 @@ tracing-appender = "^0.2"
 tracing-subscriber = { version = "^0.3", features = ["env-filter", "local-time"] }
 url = "^2.5"
 uuid = { version = "^1.21", features = ["serde", "v4"] }
+tower = { version = "^0.5", features = ["util"] }
+http-body-util = "^0.1"
+hyper = { version = "^1.6", features = ["full"] }
