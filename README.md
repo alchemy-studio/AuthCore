@@ -428,6 +428,9 @@ cargo test
 # 运行特定模块测试
 cargo test --package htycommons
 
+# 运行 E2E 认证测试（需要 PostgreSQL 和 Redis）
+./scripts/run_tests.sh
+
 # 运行测试并显示输出
 print_debug=true cargo test -- --nocapture
 
@@ -472,11 +475,75 @@ cd htyuc
 cargo test
 ```
 
-### 集成测试
+### E2E 测试
+
+项目包含完整的端到端测试，覆盖认证相关功能：
+
+#### 测试覆盖范围
+
+| 功能模块 | 测试用例 |
+|---------|---------|
+| `login_with_password` | 成功登录、错误密码、缺少用户名/密码、用户不存在、无效域名 |
+| `login_with_cert` | 无效签名、缺少/空 encrypted_data |
+| `sudo` | 成功获取 sudoer token、无认证、无效 token |
+| `sudo2` | 无认证、无效 token、切换到自己 |
+| `verify_jwt_token` | 无效 token、登录后验证 |
+| `generate_key_pair` | 无认证、登录后生成密钥对 |
+
+#### 使用 Docker 运行测试（推荐）
 
 ```bash
-# 运行完整的集成测试
-cargo test --test integration_tests
+# 使用脚本自动启动测试环境并运行测试
+./scripts/run_tests.sh
+```
+
+该脚本会自动：
+1. 启动 PostgreSQL 和 Redis 容器
+2. 运行数据库迁移
+3. 初始化测试数据
+4. 执行 E2E 测试
+5. 清理测试环境
+
+#### 手动运行测试
+
+```bash
+# 1. 启动测试数据库和 Redis
+docker compose -f docker-compose.test.yml up -d
+
+# 2. 运行数据库迁移
+cd htyuc_models
+DATABASE_URL="postgres://htyuc:htyuc@localhost:5433/htyuc_test" diesel migration run
+cd ..
+
+# 3. 初始化测试数据
+PGPASSWORD=htyuc psql -h localhost -p 5433 -U htyuc -d htyuc_test \
+  -f htyuc/tests/fixtures/init_test_data.sql
+
+# 4. 运行测试
+UC_DB_URL="postgres://htyuc:htyuc@localhost:5433/htyuc_test" \
+REDIS_HOST="localhost" \
+REDIS_PORT="6380" \
+JWT_KEY="your_test_jwt_key" \
+POOL_SIZE="5" \
+cargo test --package htyuc --test e2e_auth_tests -- --test-threads=1
+
+# 5. 清理
+docker compose -f docker-compose.test.yml down -v
+```
+
+#### 使用本地数据库运行测试
+
+如果已有本地 PostgreSQL 和 Redis 服务：
+
+```bash
+# 初始化测试数据
+psql your_database -f htyuc/tests/fixtures/init_test_data.sql
+
+# 运行测试
+UC_DB_URL="postgres://user@localhost/your_database" \
+REDIS_HOST="localhost" \
+REDIS_PORT="6379" \
+cargo test --package htyuc --test e2e_auth_tests -- --test-threads=1 --nocapture
 ```
 
 ### 性能测试

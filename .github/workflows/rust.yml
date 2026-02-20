@@ -11,12 +11,70 @@ env:
 
 jobs:
   build:
-
     runs-on: ubuntu-latest
-
     steps:
     - uses: actions/checkout@v4
     - name: Build
       run: cargo build --verbose
-    - name: Run tests
-      run: cargo test --verbose
+
+  e2e-tests:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:14
+        env:
+          POSTGRES_USER: htyuc
+          POSTGRES_PASSWORD: htyuc
+          POSTGRES_DB: htyuc_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      UC_DB_URL: postgres://htyuc:htyuc@localhost:5432/htyuc_test
+      REDIS_HOST: localhost
+      REDIS_PORT: 6379
+      JWT_KEY: test_jwt_key_for_testing_only_1234567890
+      POOL_SIZE: 5
+      EXPIRATION_DAYS: 7
+      SKIP_POST_LOGIN: true
+      SKIP_REGISTRATION: true
+      print_debug: true
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install Rust toolchain
+      uses: dtolnay/rust-toolchain@stable
+
+    - name: Install diesel_cli
+      run: cargo install diesel_cli --no-default-features --features postgres
+
+    - name: Run diesel migrations
+      working-directory: htyuc_models
+      run: |
+        diesel setup
+        diesel migration run
+      env:
+        DATABASE_URL: postgres://htyuc:htyuc@localhost:5432/htyuc_test
+
+    - name: Initialize test data
+      run: |
+        PGPASSWORD=htyuc psql -h localhost -p 5432 -U htyuc -d htyuc_test -f htyuc/tests/fixtures/init_test_data.sql
+
+    - name: Run e2e tests
+      run: cargo test --package htyuc --test e2e_auth_tests -- --test-threads=1 --nocapture
