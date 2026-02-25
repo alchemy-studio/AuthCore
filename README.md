@@ -18,6 +18,7 @@
 - [技术栈](#技术栈)
 - [快速开始](#快速开始)
 - [作为依赖使用](#作为依赖使用)
+  - [前端类型库 (AuthCoreJS)](#前端类型库-authcorejs)
 - [项目结构](#项目结构)
 - [API 文档](#api-文档)
 - [配置说明](#配置说明)
@@ -231,6 +232,13 @@ htyuc_models = { workspace = true }
 # 或使用提供的脚本
 ./htyuc/start.sh
 ```
+
+### <a id="前端类型库-authcorejs"></a>前端类型库 (AuthCoreJS)
+
+与 AuthCore UC API 对齐的 TypeScript 类型包（`@authcore/commons`），供 Vue 等前端项目使用，保证请求/响应类型与后端一致。htyadmin、htymusic 等前端均依赖此库。
+
+- **仓库**: [alchemy-studio/AuthCoreJS](https://github.com/alchemy-studio/AuthCoreJS)
+- **安装**: `npm i github:alchemy-studio/AuthCoreJS` 或在 `package.json` 中配置 `"@authcore/commons": "github:alchemy-studio/AuthCoreJS"`
 
 ### 验证安装
 
