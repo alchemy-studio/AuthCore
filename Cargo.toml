@@ -52,4 +52,4 @@ url = "^2.5"
 uuid = { version = "^1.23", features = ["serde", "v4"] }
 tower = { version = "^0.5", features = ["util"] }
 http-body-util = "^0.1"
-hyper = { version = "^1.6", features = ["full"] }
+hyper = { version = "^1.9", features = ["full"] }
