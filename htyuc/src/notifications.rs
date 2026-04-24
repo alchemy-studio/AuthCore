@@ -11,8 +11,19 @@ use chrono::Datelike;
 use tracing::debug;
 use htycommons::db::{DbState, extract_conn, fetch_db_conn, UNREAD};
 use htycommons::models::PushInfo;
+use serde_json::Value;
 use htyuc_models::send_tongzhi;
 use crate::{AppFromTo, CommonTongzhiContent, HtyApp, HtyRole, HtyTemplateData, HtyTongzhi, HtyUser, push_wx_message, TongzhiMeta, UserAppInfo};
+
+fn push_info_extra_string(info: &PushInfo, key: &str) -> Option<String> {
+    info.extra.get(key).and_then(|v| match v {
+        Value::Null => None,
+        Value::String(s) => Some(s.clone()),
+        Value::Number(n) => Some(n.to_string()),
+        Value::Bool(b) => Some(b.to_string()),
+        Value::Array(_) | Value::Object(_) => Some(v.to_string()),
+    })
+}
 
 #[allow(dead_code)]
 fn build_wx_push_message_for_teacher_register(
@@ -572,7 +583,8 @@ pub async fn raw_notify(
                     send_tongzhi!(tongzhi, to_app, push_message, db_pool);
                 }
                 "reject_register" => {
-                    let reject_reason = push_info_copy.reject_reason.clone().unwrap_or_default();
+                    let reject_reason =
+                        push_info_extra_string(&push_info_copy, "reject_reason").unwrap_or_default();
                     let push_message = build_wx_push_message_for_reject_register(
                         &notify_type,
                         &user1_id,

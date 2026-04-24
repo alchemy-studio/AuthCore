@@ -2,6 +2,8 @@ use std::fmt::Debug;
 use chrono::NaiveDateTime;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
+use serde_json::Map;
+use serde_json::Value;
 use crate::db::CommonTask;
 use crate::{impl_jsonb_boilerplate, impl_typed_jsonb_boilerplate};
 use diesel::sql_types::Jsonb;
@@ -10,6 +12,8 @@ use diesel::pg::Pg;
 // use diesel::helper_types::IsNull;
 use std::io::Write;
 
+/// Push notification envelope stored as Jsonb. Domain keys (课程/打卡/计划等) live in [`extra`]
+/// so AuthCore stays business-agnostic; flat Json round-trips with legacy rows.
 #[derive(AsExpression, FromSqlRow, Debug, Default, Serialize, Deserialize, PartialEq, Clone)]
 #[diesel(sql_type = Jsonb)]
 pub struct PushInfo {
@@ -19,32 +23,16 @@ pub struct PushInfo {
     pub comment_id: Option<String>,
     pub comment_msg: Option<String>,
     pub comment_time: Option<String>,
-    pub daka_id: Option<String>,
-    pub end_by: Option<String>,
-    pub first: Option<String>, // in wx template
     pub hty_id2: Option<String>,
     pub hty_id: Option<String>,
-    pub jihua_id: Option<String>,
-    #[serde(alias = "kecheng_id")]
-    pub clazz_id: Option<String>,
-    #[serde(alias = "kecheng_name")]
-    pub clazz_name: Option<String>,
-    pub lianxi_id: Option<String>,
     pub notify_type: Option<String>,
-    pub piyue_id: Option<String>,
-    pub qumu_name: Option<String>,
-    pub qumu_section_name: Option<String>,
     pub ref_id: Option<String>,
     pub ref_type: Option<String>,
-    pub reject_reason: Option<String>,
-    pub remark: Option<String>,
-    pub resource_note_group_id: Option<String>,
     pub serial: Option<String>,
-    pub start_from: Option<String>,
-    pub student_name: Option<String>, // list合并后的所有学生姓名，逗号分隔，发给小程序接口发通知用。
-    pub teacher_name: Option<String>, // list合并后的所有老师姓名，逗号分隔，发给小程序接口发通知用。
     pub to_role_id: Option<String>,
     pub from_app_id: Option<String>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
 }
 
 impl_jsonb_boilerplate!(PushInfo);
