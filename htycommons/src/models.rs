@@ -25,8 +25,10 @@ pub struct PushInfo {
     pub hty_id2: Option<String>,
     pub hty_id: Option<String>,
     pub jihua_id: Option<String>,
-    pub kecheng_id: Option<String>,
-    pub kecheng_name: Option<String>,
+    #[serde(alias = "kecheng_id")]
+    pub clazz_id: Option<String>,
+    #[serde(alias = "kecheng_name")]
+    pub clazz_name: Option<String>,
     pub lianxi_id: Option<String>,
     pub notify_type: Option<String>,
     pub piyue_id: Option<String>,
