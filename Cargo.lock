@@ -3137,31 +3137,14 @@ checksum = "8ecb6da28b8a351d773b68d5825ac39017e680750f980f3a1a85cd8dd28a47c1"
 name = "upyun_tool"
 version = "0.1.0"
 dependencies = [
- "aes",
  "anyhow",
- "base64",
- "block-modes",
  "chrono",
  "clap",
  "data-encoding",
- "diesel",
- "dotenv",
- "hex",
- "hex-literal",
- "htycommons",
- "jsonwebtoken",
- "log",
- "log4rs",
- "rand 0.10.0",
  "reqwest",
  "ring",
  "rust-crypto",
- "serde",
- "serde_derive",
- "serde_json",
- "thiserror 2.0.18",
  "url",
- "uuid",
 ]
 
 [[package]]
