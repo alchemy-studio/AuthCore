@@ -12,6 +12,7 @@ use htycommons::web::{
 use htycommons::uuid;
 use htyuc_models::models::{HtyApp, HtyRole, OrgMember, OrgRole, Organization, UserAppInfo};
 use std::collections::HashMap;
+use std::collections::HashSet;
 use std::ops::DerefMut;
 use std::sync::Arc;
 use tracing::{debug, error};
@@ -330,9 +331,10 @@ pub async fn my_orgs(
         let user_info_id = current_user_app_info_id(&auth, &host, conn)?;
         let members = OrgMember::find_by_user_info_id(&user_info_id, conn)?;
         let mut organizations_result = Vec::new();
+        let mut seen_org_ids = HashSet::new();
         for member in members {
             let org = Organization::find_by_id(&member.org_id, conn)?;
-            if !org.is_delete {
+            if !org.is_delete && seen_org_ids.insert(org.id.clone()) {
                 organizations_result.push(org);
             }
         }
