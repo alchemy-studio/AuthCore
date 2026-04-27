@@ -113,6 +113,32 @@ pub async fn find_org_by_id(
     }
 }
 
+pub async fn delete_org(
+    _sudoer: HtySudoerTokenHeader,
+    auth: AuthorizationHeader,
+    State(db_pool): State<Arc<DbState>>,
+    Json(body): Json<ReqOrganization>,
+) -> Json<HtyResponse<Organization>> {
+    let result = (|| -> anyhow::Result<Organization> {
+        let org_id = body.id.ok_or_else(|| anyhow!("id is required"))?;
+        let mut conn_holder = extract_conn(fetch_db_conn(&db_pool)?);
+        let conn = conn_holder.deref_mut();
+        let active_members = OrgMember::count_active_by_org_id(&org_id, conn)?;
+        if active_members > 0 {
+            return Err(anyhow!(HtyErr {
+                code: HtyErrCode::WebErr,
+                reason: Some("organization has active members and cannot be deleted".to_string()),
+            }));
+        }
+        let token = jwt_decode_token(&(*auth).clone())?;
+        Organization::soft_delete_by_id(&org_id, &token.hty_id, conn)
+    })();
+    match result {
+        Ok(ok) => wrap_json_ok_resp(ok),
+        Err(e) => wrap_json_anyhow_err(e),
+    }
+}
+
 pub async fn list_orgs_by_app(
     _sudoer: HtySudoerTokenHeader,
     State(db_pool): State<Arc<DbState>>,

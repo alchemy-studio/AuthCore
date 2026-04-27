@@ -4734,6 +4734,26 @@ impl Organization {
                 })
             })
     }
+
+    pub fn soft_delete_by_id(
+        id_org: &String,
+        updated_by_user: &Option<String>,
+        conn: &mut PgConnection,
+    ) -> anyhow::Result<Organization> {
+        diesel::update(organizations::table.filter(organizations::id.eq(id_org)))
+            .set((
+                organizations::is_delete.eq(true),
+                organizations::updated_at.eq(Some(current_local_datetime())),
+                organizations::updated_by.eq(updated_by_user.clone()),
+            ))
+            .get_result(conn)
+            .map_err(|e| {
+                anyhow!(HtyErr {
+                    code: HtyErrCode::DbErr,
+                    reason: Some(e.to_string()),
+                })
+            })
+    }
 }
 
 #[derive(
@@ -4860,6 +4880,24 @@ impl OrgMember {
         hty_roles::table
             .filter(hty_roles::hty_role_id.eq_any(role_ids))
             .load::<HtyRole>(conn)
+            .map_err(|e| {
+                anyhow!(HtyErr {
+                    code: HtyErrCode::DbErr,
+                    reason: Some(e.to_string()),
+                })
+            })
+    }
+
+    pub fn count_active_by_org_id(
+        id_org: &String,
+        conn: &mut PgConnection,
+    ) -> anyhow::Result<i64> {
+        use crate::schema::org_members::dsl::*;
+        org_members
+            .filter(org_id.eq(id_org))
+            .filter(member_status.eq("ACTIVE"))
+            .count()
+            .get_result::<i64>(conn)
             .map_err(|e| {
                 anyhow!(HtyErr {
                     code: HtyErrCode::DbErr,

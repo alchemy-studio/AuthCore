@@ -7200,6 +7200,7 @@ pub fn uc_rocket(db_url: &str) -> Router {
         .route("/api/v1/uc/bulk_update_tag_ref", post(bulk_update_tag_ref))
         .route("/api/v1/uc/org/create", post(ws_org::create_org))
         .route("/api/v1/uc/org/update", post(ws_org::update_org))
+        .route("/api/v1/uc/org/delete", post(ws_org::delete_org))
         .route("/api/v1/uc/org/{id}", get(ws_org::find_org_by_id))
         .route("/api/v1/uc/org/list_by_app", get(ws_org::list_orgs_by_app))
         .route("/api/v1/uc/org/add_member", post(ws_org::add_org_member))
