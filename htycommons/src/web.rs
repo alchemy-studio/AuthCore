@@ -210,8 +210,12 @@ where
 
     async fn from_request_parts(req: &mut Parts, _state: &B) -> Result<Self, Self::Rejection> {
         let headers = &req.headers;
+        let host_header_val = headers
+            .get("HtyHost")
+            .or_else(|| headers.get("Host"))
+            .ok_or_else(|| internal_error(std::io::Error::new(std::io::ErrorKind::InvalidInput, "missing host header")))?;
         Ok(Self(
-            headers["HtyHost"]
+            host_header_val
                 .to_str()
                 .map_err(internal_error)?
                 .to_string(),
