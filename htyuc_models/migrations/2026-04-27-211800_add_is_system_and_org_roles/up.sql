@@ -21,6 +21,23 @@ create table if not exists org_roles
             references hty_users (hty_id)
 );
 
+create unique index if not exists org_roles_id_uindex
+    on org_roles (id);
+
+do $$
+begin
+    if not exists (
+        select 1
+        from pg_constraint
+        where conname = 'org_roles_pk'
+          and conrelid = 'org_roles'::regclass
+    ) then
+        alter table org_roles
+            add constraint org_roles_pk
+                primary key (id);
+    end if;
+end $$;
+
 create unique index if not exists idx_org_roles_org_role_unique
     on org_roles (org_id, role_id);
 
