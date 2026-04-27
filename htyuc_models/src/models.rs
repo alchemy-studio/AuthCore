@@ -4889,6 +4889,29 @@ impl OrgMember {
             })
     }
 
+    pub fn find_system_roles_by_user_info_id(
+        id_user_info: &String,
+        conn: &mut PgConnection,
+    ) -> anyhow::Result<Vec<HtyRole>> {
+        let members = user_info_roles::table
+            .filter(user_info_roles::user_info_id.eq(id_user_info))
+            .load::<UserInfoRole>(conn)?;
+        let role_ids: Vec<String> = members.iter().map(|item| item.role_id.clone()).collect();
+        if role_ids.is_empty() {
+            return Ok(vec![]);
+        }
+        hty_roles::table
+            .filter(hty_roles::hty_role_id.eq_any(role_ids))
+            .filter(hty_roles::is_system.eq(true))
+            .load::<HtyRole>(conn)
+            .map_err(|e| {
+                anyhow!(HtyErr {
+                    code: HtyErrCode::DbErr,
+                    reason: Some(e.to_string()),
+                })
+            })
+    }
+
     pub fn count_active_by_org_id(
         id_org: &String,
         conn: &mut PgConnection,

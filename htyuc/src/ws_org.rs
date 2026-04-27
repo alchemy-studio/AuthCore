@@ -347,17 +347,26 @@ pub async fn switch_org(
         let mut conn_holder = extract_conn(fetch_db_conn(&db_pool)?);
         let conn = conn_holder.deref_mut();
         let user_info_id = current_user_app_info_id(&auth, conn)?;
-        let roles = OrgMember::find_roles_by_user_info_id_and_org_id(&user_info_id, &target_org_id, conn)?;
-        if roles.is_empty() {
+        let mut org_roles = OrgMember::find_roles_by_user_info_id_and_org_id(&user_info_id, &target_org_id, conn)?;
+        let system_roles = OrgMember::find_system_roles_by_user_info_id(&user_info_id, conn)?;
+        if org_roles.is_empty() {
             return Err(anyhow!(HtyErr {
                 code: HtyErrCode::AuthenticationFailed,
                 reason: Some("user has no role in target org".to_string()),
             }));
         }
+        for system_role in system_roles {
+            if !org_roles
+                .iter()
+                .any(|existing_role| existing_role.hty_role_id == system_role.hty_role_id)
+            {
+                org_roles.push(system_role);
+            }
+        }
         apply_org_context_to_token(
             &mut token,
             target_org_id,
-            roles.into_iter().map(|role| role.role_key).collect(),
+            org_roles.into_iter().map(|role| role.role_key).collect(),
             uuid(),
         );
         save_token_with_exp_days(&token, get_token_expiration_days()?)?;
