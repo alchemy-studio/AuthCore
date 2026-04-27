@@ -478,6 +478,14 @@ pub struct ReqHtyRole {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ReqOrgRole {
+    pub id: Option<String>,
+    pub org_id: Option<String>,
+    pub role_id: Option<String>,
+    pub role_status: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ReqHtyAction {
     pub hty_action_id: Option<String>,
     pub action_name: Option<String>,

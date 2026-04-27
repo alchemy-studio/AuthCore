@@ -90,6 +90,7 @@ diesel::table! {
         role_key -> Varchar,
         role_desc -> Nullable<Varchar>,
         role_status -> Varchar,
+        is_system -> Bool,
         style -> Nullable<Varchar>,
         role_name -> Nullable<Varchar>,
     }
@@ -231,6 +232,19 @@ diesel::table! {
 }
 
 diesel::table! {
+    org_roles (id) {
+        id -> Varchar,
+        org_id -> Varchar,
+        role_id -> Varchar,
+        role_status -> Varchar,
+        created_at -> Timestamp,
+        created_by -> Nullable<Varchar>,
+        updated_at -> Nullable<Timestamp>,
+        updated_by -> Nullable<Varchar>,
+    }
+}
+
+diesel::table! {
     roles_actions (the_id) {
         the_id -> Varchar,
         role_id -> Varchar,
@@ -289,6 +303,8 @@ diesel::joinable!(hty_user_group -> hty_apps (app_id));
 diesel::joinable!(org_members -> hty_roles (role_id));
 diesel::joinable!(org_members -> organizations (org_id));
 diesel::joinable!(org_members -> user_app_info (user_info_id));
+diesel::joinable!(org_roles -> hty_roles (role_id));
+diesel::joinable!(org_roles -> organizations (org_id));
 diesel::joinable!(organizations -> hty_apps (app_id));
 diesel::joinable!(roles_actions -> hty_actions (action_id));
 diesel::joinable!(roles_actions -> hty_roles (role_id));
@@ -319,6 +335,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     hty_users,
     hty_visitors,
     org_members,
+    org_roles,
     organizations,
     roles_actions,
     roles_labels,

@@ -27,7 +27,7 @@ use htycommons::models::*;
 use crate::schema::{
     actions_labels, app_from_to, apps_roles, hty_actions, hty_apps, hty_gonggao, hty_labels,
     hty_resources, hty_roles, hty_tag_refs, hty_tags, hty_template, hty_template_data, hty_tongzhi,
-    hty_user_group, hty_users, org_members, organizations, roles_actions, roles_labels, user_app_info,
+    hty_user_group, hty_users, org_members, org_roles, organizations, roles_actions, roles_labels, user_app_info,
     user_info_roles, hty_user_rels,
 };
 // use crate::schema::hty_resources::dsl::hty_resources;
@@ -2116,6 +2116,7 @@ pub struct HtyRole {
     pub role_key: String,
     pub role_desc: Option<String>,
     pub role_status: String,
+    pub is_system: bool,
     pub style: Option<String>,
     pub role_name: Option<String>,
 }
@@ -4904,5 +4905,99 @@ impl OrgMember {
                     reason: Some(e.to_string()),
                 })
             })
+    }
+}
+
+#[derive(
+Identifiable,
+PartialEq,
+Associations,
+Serialize,
+Deserialize,
+Queryable,
+Debug,
+Insertable,
+Clone,
+AsChangeset,
+)]
+#[diesel(table_name = org_roles)]
+#[diesel(primary_key(id))]
+#[diesel(belongs_to(Organization, foreign_key = org_id))]
+#[diesel(belongs_to(HtyRole, foreign_key = role_id))]
+pub struct OrgRole {
+    pub id: String,
+    pub org_id: String,
+    pub role_id: String,
+    pub role_status: String,
+    pub created_at: NaiveDateTime,
+    pub created_by: Option<String>,
+    pub updated_at: Option<NaiveDateTime>,
+    pub updated_by: Option<String>,
+}
+
+impl OrgRole {
+    pub fn create(entry: &OrgRole, conn: &mut PgConnection) -> anyhow::Result<OrgRole> {
+        use crate::schema::org_roles::dsl::*;
+        insert_into(org_roles).values(entry).get_result(conn).map_err(|e| {
+            anyhow!(HtyErr {
+                code: HtyErrCode::DbErr,
+                reason: Some(e.to_string()),
+            })
+        })
+    }
+
+    pub fn delete_by_org_id_and_role_id(
+        id_org: &String,
+        id_role: &String,
+        conn: &mut PgConnection,
+    ) -> anyhow::Result<usize> {
+        use crate::schema::org_roles::dsl::*;
+        diesel::delete(org_roles.filter(org_id.eq(id_org)).filter(role_id.eq(id_role)))
+            .execute(conn)
+            .map_err(|e| {
+                anyhow!(HtyErr {
+                    code: HtyErrCode::DbErr,
+                    reason: Some(e.to_string()),
+                })
+            })
+    }
+
+    pub fn find_active_role_ids_by_org_id(
+        id_org: &String,
+        conn: &mut PgConnection,
+    ) -> anyhow::Result<Vec<String>> {
+        use crate::schema::org_roles::dsl::*;
+        org_roles
+            .filter(org_id.eq(id_org))
+            .filter(role_status.eq("ACTIVE"))
+            .select(role_id)
+            .load::<String>(conn)
+            .map_err(|e| {
+                anyhow!(HtyErr {
+                    code: HtyErrCode::DbErr,
+                    reason: Some(e.to_string()),
+                })
+            })
+    }
+
+    pub fn exists_active_org_role(
+        id_org: &String,
+        id_role: &String,
+        conn: &mut PgConnection,
+    ) -> anyhow::Result<bool> {
+        use crate::schema::org_roles::dsl::*;
+        select(exists(
+            org_roles
+                .filter(org_id.eq(id_org))
+                .filter(role_id.eq(id_role))
+                .filter(role_status.eq("ACTIVE")),
+        ))
+        .get_result::<bool>(conn)
+        .map_err(|e| {
+            anyhow!(HtyErr {
+                code: HtyErrCode::DbErr,
+                reason: Some(e.to_string()),
+            })
+        })
     }
 }

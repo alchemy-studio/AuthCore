@@ -4059,6 +4059,10 @@ fn raw_create_or_update_roles(
                 role_key,
                 role_desc: role.role_desc.clone(),
                 role_status,
+                is_system: matches!(
+                    role.role_key.clone().unwrap_or_default().as_str(),
+                    "ROOT" | "TESTER" | "ADMIN" | "GUEST"
+                ),
                 style: role.style.clone(),
                 role_name: role.role_name.clone(),
             };
@@ -4144,6 +4148,10 @@ fn raw_create_or_update_roles(
                         role_key,
                         role_desc: role.clone().role_desc,
                         role_status,
+                        is_system: matches!(
+                            role.role_key.clone().unwrap_or_default().as_str(),
+                            "ROOT" | "TESTER" | "ADMIN" | "GUEST"
+                        ),
                         style: role.style.clone(),
                         role_name: role.role_name.clone(),
                     };
@@ -7206,6 +7214,9 @@ pub fn uc_rocket(db_url: &str) -> Router {
         .route("/api/v1/uc/org/add_member", post(ws_org::add_org_member))
         .route("/api/v1/uc/org/remove_member", post(ws_org::remove_org_member))
         .route("/api/v1/uc/org/members/{org_id}", get(ws_org::find_org_members))
+        .route("/api/v1/uc/org/add_role", post(ws_org::add_org_role))
+        .route("/api/v1/uc/org/remove_role", post(ws_org::remove_org_role))
+        .route("/api/v1/uc/org/roles/{org_id}", get(ws_org::list_org_roles))
         .route("/api/v1/uc/org/my_orgs", get(ws_org::my_orgs))
         .route("/api/v1/uc/org/switch", post(ws_org::switch_org))
         .route("/api/v1/uc/org/save_homepage", post(ws_org::save_org_homepage))

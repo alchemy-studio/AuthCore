@@ -52,6 +52,7 @@ pub fn insert_root_role(conn: &mut PgConnection) -> String {
         role_key: "ROOT".to_string(),
         role_desc: Some("ROOT".to_string()),
         role_status: APP_STATUS_ACTIVE.to_string(),
+        is_system: true,
         style: None,
         role_name: None,
     };
@@ -70,6 +71,7 @@ pub fn insert_admin_role(conn: &mut PgConnection) -> String {
         role_key: "ADMIN".to_string(),
         role_desc: Some("管理员".to_string()),
         role_status: APP_STATUS_ACTIVE.to_string(),
+        is_system: true,
         style: None,
         role_name: None,
     };
@@ -89,6 +91,7 @@ pub fn insert_tester_role(app_id: &String, conn: &mut PgConnection) -> String {
         role_key: "TESTER".to_string(),
         role_desc: Some("测试员".to_string()),
         role_status: APP_STATUS_ACTIVE.to_string(),
+        is_system: true,
         style: None,
         role_name: None,
     };
@@ -435,6 +438,7 @@ pub fn insert_teacher_role(app_id: &String, conn: &mut PgConnection) -> HtyRole 
         role_key: "TEACHER".to_string(),
         role_desc: Some("教师".to_string()),
         role_status: APP_STATUS_ACTIVE.to_string(),
+        is_system: false,
         style: None,
         role_name: None,
     };
@@ -458,6 +462,7 @@ pub fn insert_student_role(app_id: &String, conn: &mut PgConnection) -> HtyRole 
         role_key: "STUDENT".to_string(),
         role_desc: Some("学生".to_string()),
         role_status: APP_STATUS_ACTIVE.to_string(),
+        is_system: false,
         style: None,
         role_name: None,
     };

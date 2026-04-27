@@ -7,10 +7,10 @@ use htycommons::jwt::{jwt_decode_token, jwt_encode_token};
 use htycommons::redis_util::{get_token_expiration_days, save_token_with_exp_days};
 use htycommons::web::{
     wrap_json_anyhow_err, wrap_json_ok_resp, AuthorizationHeader, HtySudoerTokenHeader,
-    ReqOrgMember, ReqOrganization, ReqOrgSwitch,
+    ReqOrgMember, ReqOrgRole, ReqOrganization, ReqOrgSwitch,
 };
 use htycommons::uuid;
-use htyuc_models::models::{OrgMember, Organization, UserAppInfo};
+use htyuc_models::models::{HtyRole, OrgMember, OrgRole, Organization, UserAppInfo};
 use std::collections::HashMap;
 use std::ops::DerefMut;
 use std::sync::Arc;
@@ -164,12 +164,32 @@ pub async fn add_org_member(
     Json(body): Json<ReqOrgMember>,
 ) -> Json<HtyResponse<OrgMember>> {
     let result = (|| -> anyhow::Result<OrgMember> {
+        let id_org = body.org_id.ok_or_else(|| anyhow!("org_id is required"))?;
+        let id_role = body.role_id.ok_or_else(|| anyhow!("role_id is required"))?;
+        let role = HtyRole::find_by_id(&id_role, extract_conn(fetch_db_conn(&db_pool)?).deref_mut())?;
+        if role.is_system {
+            return Err(anyhow!(HtyErr {
+                code: HtyErrCode::WebErr,
+                reason: Some("system role cannot be assigned as org member".to_string()),
+            }));
+        }
+        let role_in_org = OrgRole::exists_active_org_role(
+            &id_org,
+            &id_role,
+            extract_conn(fetch_db_conn(&db_pool)?).deref_mut(),
+        )?;
+        if !role_in_org {
+            return Err(anyhow!(HtyErr {
+                code: HtyErrCode::WebErr,
+                reason: Some("role does not belong to current organization".to_string()),
+            }));
+        }
         let now = current_local_datetime();
         let member = OrgMember {
             id: body.id.unwrap_or_else(uuid),
-            org_id: body.org_id.ok_or_else(|| anyhow!("org_id is required"))?,
+            org_id: id_org,
             user_info_id: body.user_info_id.ok_or_else(|| anyhow!("user_info_id is required"))?,
-            role_id: body.role_id.ok_or_else(|| anyhow!("role_id is required"))?,
+            role_id: id_role,
             member_status: body.member_status.unwrap_or_else(|| "ACTIVE".to_string()),
             joined_at: now,
             created_at: now,
@@ -178,6 +198,83 @@ pub async fn add_org_member(
             updated_by: None,
         };
         OrgMember::create(&member, extract_conn(fetch_db_conn(&db_pool)?).deref_mut())
+    })();
+    match result {
+        Ok(ok) => wrap_json_ok_resp(ok),
+        Err(e) => wrap_json_anyhow_err(e),
+    }
+}
+
+pub async fn add_org_role(
+    _sudoer: HtySudoerTokenHeader,
+    State(db_pool): State<Arc<DbState>>,
+    Json(body): Json<ReqOrgRole>,
+) -> Json<HtyResponse<OrgRole>> {
+    let result = (|| -> anyhow::Result<OrgRole> {
+        let id_org = body.org_id.ok_or_else(|| anyhow!("org_id is required"))?;
+        let id_role = body.role_id.ok_or_else(|| anyhow!("role_id is required"))?;
+        let role = HtyRole::find_by_id(&id_role, extract_conn(fetch_db_conn(&db_pool)?).deref_mut())?;
+        if role.is_system {
+            return Err(anyhow!(HtyErr {
+                code: HtyErrCode::WebErr,
+                reason: Some("system role does not need org binding".to_string()),
+            }));
+        }
+        let now = current_local_datetime();
+        let entity = OrgRole {
+            id: body.id.unwrap_or_else(uuid),
+            org_id: id_org,
+            role_id: id_role,
+            role_status: body.role_status.unwrap_or_else(|| "ACTIVE".to_string()),
+            created_at: now,
+            created_by: None,
+            updated_at: None,
+            updated_by: None,
+        };
+        OrgRole::create(&entity, extract_conn(fetch_db_conn(&db_pool)?).deref_mut())
+    })();
+    match result {
+        Ok(ok) => wrap_json_ok_resp(ok),
+        Err(e) => wrap_json_anyhow_err(e),
+    }
+}
+
+pub async fn remove_org_role(
+    _sudoer: HtySudoerTokenHeader,
+    State(db_pool): State<Arc<DbState>>,
+    Json(body): Json<ReqOrgRole>,
+) -> Json<HtyResponse<usize>> {
+    let result = (|| -> anyhow::Result<usize> {
+        OrgRole::delete_by_org_id_and_role_id(
+            &body.org_id.ok_or_else(|| anyhow!("org_id is required"))?,
+            &body.role_id.ok_or_else(|| anyhow!("role_id is required"))?,
+            extract_conn(fetch_db_conn(&db_pool)?).deref_mut(),
+        )
+    })();
+    match result {
+        Ok(ok) => wrap_json_ok_resp(ok),
+        Err(e) => wrap_json_anyhow_err(e),
+    }
+}
+
+pub async fn list_org_roles(
+    _sudoer: HtySudoerTokenHeader,
+    State(db_pool): State<Arc<DbState>>,
+    Path(org_id): Path<String>,
+) -> Json<HtyResponse<Vec<HtyRole>>> {
+    let result = (|| -> anyhow::Result<Vec<HtyRole>> {
+        let role_ids = OrgRole::find_active_role_ids_by_org_id(
+            &org_id,
+            extract_conn(fetch_db_conn(&db_pool)?).deref_mut(),
+        )?;
+        if role_ids.is_empty() {
+            return Ok(vec![]);
+        }
+        let all_roles = HtyRole::find_all(extract_conn(fetch_db_conn(&db_pool)?).deref_mut())?;
+        Ok(all_roles
+            .into_iter()
+            .filter(|role| role_ids.contains(&role.hty_role_id))
+            .collect())
     })();
     match result {
         Ok(ok) => wrap_json_ok_resp(ok),
