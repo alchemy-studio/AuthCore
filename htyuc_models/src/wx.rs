@@ -32,6 +32,8 @@ pub fn identify2(id: &WxId, app_id: &String, conn: &mut PgConnection) -> anyhow:
                     .info(app_id, conn)?
                     .req_roles_by_id(conn)?,
                 tags: None,
+                current_org_id: None,
+                current_org_role_keys: None,
             })
         }
         Err(_) => {
@@ -73,6 +75,8 @@ pub fn identify2(id: &WxId, app_id: &String, conn: &mut PgConnection) -> anyhow:
                 ts: current_local_datetime(),
                 roles: None,
                 tags: None,
+                current_org_id: None,
+                current_org_role_keys: None,
             })
         }
     }

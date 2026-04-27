@@ -534,6 +534,8 @@ pub struct HtyToken {
     // generated time
     pub roles: Option<Vec<ReqHtyRole>>,
     pub tags: Option<Vec<ReqHtyTag>>,
+    pub current_org_id: Option<String>,
+    pub current_org_role_keys: Option<Vec<String>>,
 }
 
 impl HtyToken {
@@ -587,5 +589,33 @@ pub struct ReqTeacherStudentsQuery {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ReqCommonQuery {
     pub vals: Option<Vec<String>>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ReqOrganization {
+    pub id: Option<String>,
+    pub app_id: Option<String>,
+    pub org_name: Option<String>,
+    pub org_desc: Option<String>,
+    pub homepage_md: Option<String>,
+    pub org_status: Option<String>,
+    pub created_by: Option<String>,
+    pub updated_by: Option<String>,
+    pub is_delete: Option<bool>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ReqOrgMember {
+    pub id: Option<String>,
+    pub org_id: Option<String>,
+    pub user_info_id: Option<String>,
+    pub role_id: Option<String>,
+    pub member_status: Option<String>,
+    pub created_by: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ReqOrgSwitch {
+    pub org_id: Option<String>,
 }
 

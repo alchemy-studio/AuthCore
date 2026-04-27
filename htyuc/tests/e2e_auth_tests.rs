@@ -2,6 +2,7 @@ mod common;
 
 use axum::http::StatusCode;
 use dotenv::dotenv;
+use htycommons::jwt::jwt_decode_token;
 use serde_json::json;
 
 use common::{TestApp, TestCert, get_test_db_url};
@@ -510,4 +511,176 @@ async fn test_index_endpoint() {
         .await;
 
     assert_eq!(status, StatusCode::OK, "Index endpoint should return OK");
+}
+
+// ============================================================================
+// org switch Tests
+// ============================================================================
+
+#[tokio::test]
+async fn test_switch_org_requires_org_id_in_body() {
+    let app = match std::panic::catch_unwind(setup) {
+        Ok(ok) => ok,
+        Err(_) => {
+            println!("DB unavailable in current test env, skip switch_org test");
+            return;
+        }
+    };
+
+    let login_body = json!({
+        "username": "root",
+        "password": "root"
+    });
+
+    let (login_status, login_response) = app
+        .post_json(
+            "/api/v1/uc/login_with_password",
+            &login_body.to_string(),
+            vec![("HtyHost", "root")],
+        )
+        .await;
+
+    if login_status != StatusCode::OK {
+        println!(
+            "Login failed (expected in test env without proper setup): {:?}",
+            login_response
+        );
+        return;
+    }
+
+    let token = login_response["d"].as_str().unwrap();
+
+    let (switch_status, switch_response) = app
+        .post_json(
+            "/api/v1/uc/org/switch",
+            "{}",
+            vec![
+                ("Authorization", token),
+                ("HtyHost", "root"),
+            ],
+        )
+        .await;
+
+    assert!(
+        switch_status == StatusCode::OK
+            || switch_status == StatusCode::UNAUTHORIZED
+            || switch_status == StatusCode::BAD_REQUEST,
+        "Unexpected status for switch_org missing org_id: {:?}, body: {:?}",
+        switch_status,
+        switch_response
+    );
+    assert!(
+        !switch_response["r"].as_bool().unwrap_or(true),
+        "switch_org should fail when org_id is missing, body: {:?}",
+        switch_response
+    );
+}
+
+#[tokio::test]
+async fn test_switch_org_sets_current_org_context_in_token_when_membership_exists() {
+    let app = match std::panic::catch_unwind(setup) {
+        Ok(ok) => ok,
+        Err(_) => {
+            println!("DB unavailable in current test env, skip switch_org context test");
+            return;
+        }
+    };
+
+    let login_body = json!({
+        "username": "root",
+        "password": "root"
+    });
+
+    let (login_status, login_response) = app
+        .post_json(
+            "/api/v1/uc/login_with_password",
+            &login_body.to_string(),
+            vec![("HtyHost", "root")],
+        )
+        .await;
+
+    if login_status != StatusCode::OK {
+        println!(
+            "Login failed (expected in test env without proper setup): {:?}",
+            login_response
+        );
+        return;
+    }
+
+    let original_token = login_response["d"]
+        .as_str()
+        .expect("login response should contain jwt token string");
+
+    let (my_orgs_status, my_orgs_response) = app
+        .get(
+            "/api/v1/uc/org/my_orgs",
+            vec![
+                ("Authorization", original_token),
+                ("HtyHost", "root"),
+            ],
+        )
+        .await;
+
+    if my_orgs_status != StatusCode::OK || !my_orgs_response["r"].as_bool().unwrap_or(false) {
+        println!(
+            "my_orgs unavailable in current test env, skip switch verification: {:?}",
+            my_orgs_response
+        );
+        return;
+    }
+
+    let organization_array = my_orgs_response["d"]
+        .as_array()
+        .expect("my_orgs response d should be array");
+    if organization_array.is_empty() {
+        println!("my_orgs returned empty list, skip switch verification");
+        return;
+    }
+
+    let target_org_id = organization_array[0]["id"]
+        .as_str()
+        .expect("organization id should be string")
+        .to_string();
+
+    let switch_body = json!({ "org_id": target_org_id });
+    let (switch_status, switch_response) = app
+        .post_json(
+            "/api/v1/uc/org/switch",
+            &switch_body.to_string(),
+            vec![
+                ("Authorization", original_token),
+                ("HtyHost", "root"),
+            ],
+        )
+        .await;
+
+    assert_eq!(
+        switch_status,
+        StatusCode::OK,
+        "switch_org should return 200 when org membership exists, body: {:?}",
+        switch_response
+    );
+    assert!(
+        switch_response["r"].as_bool().unwrap_or(false),
+        "switch_org should succeed, body: {:?}",
+        switch_response
+    );
+
+    let switched_token = switch_response["d"]
+        .as_str()
+        .expect("switch response should return jwt token string");
+    let decoded_token = jwt_decode_token(&switched_token.to_string())
+        .expect("switched token should be decodable");
+
+    assert_eq!(
+        decoded_token.current_org_id,
+        switch_body["org_id"].as_str().map(|value| value.to_string())
+    );
+    assert!(
+        decoded_token
+            .current_org_role_keys
+            .map(|role_keys| !role_keys.is_empty())
+            .unwrap_or(false),
+        "switched token should carry org role keys"
+    );
 }

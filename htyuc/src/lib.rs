@@ -37,6 +37,7 @@ use htycommons::models::*;
 
 pub mod ddl;
 pub mod r_uc;
+pub mod ws_org;
 mod notifications;
 
 
@@ -5453,6 +5454,8 @@ fn raw_sudo2(auth: AuthorizationHeader, host: HtyHostHeader, to_user_id: String,
             ts: current_local_datetime(),
             roles: user_app_info.req_roles_by_id(conn)?,
             tags: None,
+            current_org_id: None,
+            current_org_role_keys: None,
         };
         save_token_with_exp_days(&resp_token, get_token_expiration_days()?)?;
         Ok(jwt_encode_token(resp_token)?)
@@ -5506,6 +5509,8 @@ fn raw_sudo(auth: AuthorizationHeader, conn: &mut PgConnection) -> anyhow::Resul
                 ts: current_local_datetime(),
                 roles: root_user_info.req_roles_by_id(conn)?,
                 tags: None,
+                current_org_id: None,
+                current_org_role_keys: None,
             };
 
             //Save sudoer token
@@ -5584,6 +5589,8 @@ fn raw_login_with_password(
         ts: current_local_datetime(),
         roles: info.req_roles_by_id(extract_conn(fetch_db_conn(&db_pool)?).deref_mut())?,
         tags: None,
+        current_org_id: None,
+        current_org_role_keys: None,
     };
 
     return if info.password == req_login.password {
@@ -5690,6 +5697,8 @@ async fn raw_wx_qr_login(code: String, app_domain: String, db_pool: Arc<DbState>
         ts: current_local_datetime(),
         roles: this_app_user_info.req_roles_by_id(extract_conn(fetch_db_conn(&db_pool)?).deref_mut())?,
         tags: None,
+        current_org_id: None,
+        current_org_role_keys: None,
     };
 
     debug!("raw_wx_qr_login -> resp_token: {:?}", &resp_token);
@@ -5917,6 +5926,8 @@ fn raw_login2_with_unionid_tx(
                             .info(&some_app.app_id, conn)?
                             .req_roles_by_id(conn)?,
                         tags: None,
+                        current_org_id: None,
+                        current_org_role_keys: None,
                     },
                     None => HtyToken {
                         token_id: uuid(),
@@ -5925,6 +5936,8 @@ fn raw_login2_with_unionid_tx(
                         ts: current_local_datetime(),
                         roles: None,
                         tags: None,
+                        current_org_id: None,
+                        current_org_role_keys: None,
                     },
                 };
 
@@ -6472,6 +6485,8 @@ fn raw_login_with_cert(
                 roles: None,
                 // FIXME: tags should contain `SYS_ROOT` tag
                 tags: None,
+                current_org_id: None,
+                current_org_role_keys: None,
             };
 
             save_token_with_exp_days(&resp_token, get_token_expiration_days()?)?;
@@ -7183,6 +7198,17 @@ pub fn uc_rocket(db_url: &str) -> Router {
             post(update_needs_refresh_for_app),
         )
         .route("/api/v1/uc/bulk_update_tag_ref", post(bulk_update_tag_ref))
+        .route("/api/v1/uc/org/create", post(ws_org::create_org))
+        .route("/api/v1/uc/org/update", post(ws_org::update_org))
+        .route("/api/v1/uc/org/{id}", get(ws_org::find_org_by_id))
+        .route("/api/v1/uc/org/list_by_app", get(ws_org::list_orgs_by_app))
+        .route("/api/v1/uc/org/add_member", post(ws_org::add_org_member))
+        .route("/api/v1/uc/org/remove_member", post(ws_org::remove_org_member))
+        .route("/api/v1/uc/org/members/{org_id}", get(ws_org::find_org_members))
+        .route("/api/v1/uc/org/my_orgs", get(ws_org::my_orgs))
+        .route("/api/v1/uc/org/switch", post(ws_org::switch_org))
+        .route("/api/v1/uc/org/save_homepage", post(ws_org::save_org_homepage))
+        .route("/api/v1/uc/org/homepage/{org_id}", get(ws_org::get_org_homepage))
         .layer(TraceLayer::new_for_http())
         .with_state(shared_db_state);
 
