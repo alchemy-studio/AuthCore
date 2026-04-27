@@ -5928,7 +5928,7 @@ fn raw_login2_with_unionid_tx(
                     Some(some_app) => HtyToken {
                         token_id: uuid(),
                         hty_id: Some(login_user.hty_id.clone()),
-                        app_id: None,
+                        app_id: Some(some_app.app_id.clone()),
                         ts: current_local_datetime(),
                         roles: login_user
                             .info(&some_app.app_id, conn)?
