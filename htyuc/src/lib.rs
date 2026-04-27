@@ -5447,7 +5447,8 @@ fn raw_sudo2(auth: AuthorizationHeader, host: HtyHostHeader, to_user_id: String,
     let user_tags = get_all_db_tags_of_the_user(auth, host, conn)?;
     debug!("raw_sudo2 -> user_tags: {:?}", user_tags);
 
-    let id_current_user = jwt_decode_token(&(*the_auth).clone())?
+    let decoded_auth_token = jwt_decode_token(&(*the_auth).clone())?;
+    let id_current_user = decoded_auth_token
         .hty_id
         .ok_or_else(|| anyhow::anyhow!("hty_id is required in token"))?;
 
@@ -5462,8 +5463,8 @@ fn raw_sudo2(auth: AuthorizationHeader, host: HtyHostHeader, to_user_id: String,
             ts: current_local_datetime(),
             roles: user_app_info.req_roles_by_id(conn)?,
             tags: None,
-            current_org_id: None,
-            current_org_role_keys: None,
+            current_org_id: decoded_auth_token.current_org_id.clone(),
+            current_org_role_keys: decoded_auth_token.current_org_role_keys.clone(),
         };
         save_token_with_exp_days(&resp_token, get_token_expiration_days()?)?;
         Ok(jwt_encode_token(resp_token)?)
@@ -5492,6 +5493,7 @@ pub async fn sudo(auth: AuthorizationHeader, conn: db::DbConn) -> Json<HtyRespon
 // todo：ADD `SYS_SUDO` TAG TO VERIFY.
 fn raw_sudo(auth: AuthorizationHeader, conn: &mut PgConnection) -> anyhow::Result<String> {
     let jwt_token = &(*auth).clone();
+    let decoded_auth_token = jwt_decode_token(jwt_token)?;
 
     debug!("raw_sudo -> in_token: {:?}", jwt_token);
 
@@ -5517,8 +5519,8 @@ fn raw_sudo(auth: AuthorizationHeader, conn: &mut PgConnection) -> anyhow::Resul
                 ts: current_local_datetime(),
                 roles: root_user_info.req_roles_by_id(conn)?,
                 tags: None,
-                current_org_id: None,
-                current_org_role_keys: None,
+                current_org_id: decoded_auth_token.current_org_id.clone(),
+                current_org_role_keys: decoded_auth_token.current_org_role_keys.clone(),
             };
 
             //Save sudoer token
