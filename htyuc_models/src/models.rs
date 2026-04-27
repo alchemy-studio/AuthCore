@@ -4335,6 +4335,7 @@ pub struct HtyUserRels {
     pub from_user_id: String,
     pub to_user_id: String,
     pub rel_type: String,
+    pub org_id: Option<String>,
 }
 
 impl HtyUserRels {
@@ -4356,11 +4357,12 @@ impl HtyUserRels {
         in_rel_type: &Option<String>,
         in_from_user_id: &Option<String>,
         in_to_user_id: &Option<String>,
+        in_org_id: &String,
         conn: &mut PgConnection) -> anyhow::Result<Vec<HtyUserRels>> {
-        debug!("find_all_with_params -> rel_type: {:?} / from_user_id: {:?} / to_user_id: {:?}", in_rel_type, in_from_user_id, in_to_user_id);
+        debug!("find_all_with_params -> rel_type: {:?} / from_user_id: {:?} / to_user_id: {:?} / org_id: {:?}", in_rel_type, in_from_user_id, in_to_user_id, in_org_id);
 
         use crate::schema::hty_user_rels::columns::*;
-        let mut q = hty_user_rels::table.into_boxed();
+        let mut q = hty_user_rels::table.filter(org_id.eq(in_org_id)).into_boxed();
 
         if let Some(rel_type_val) = in_rel_type.clone() {
             q = q.filter(rel_type.eq(rel_type_val));
@@ -4383,8 +4385,20 @@ impl HtyUserRels {
         }
     }
 
-    pub fn find_by_all_col(id_user_from: &String, id_user_to: &String, type_rel: &String, conn: &mut PgConnection) -> anyhow::Result<HtyUserRels> {
-        match hty_user_rels::table.filter(hty_user_rels::from_user_id.eq(id_user_from).and(hty_user_rels::to_user_id.eq(id_user_to)).and(hty_user_rels::rel_type.eq(type_rel)))
+    pub fn find_by_all_col(
+        id_user_from: &String,
+        id_user_to: &String,
+        type_rel: &String,
+        id_org: &String,
+        conn: &mut PgConnection,
+    ) -> anyhow::Result<HtyUserRels> {
+        match hty_user_rels::table.filter(
+            hty_user_rels::from_user_id
+                .eq(id_user_from)
+                .and(hty_user_rels::to_user_id.eq(id_user_to))
+                .and(hty_user_rels::rel_type.eq(type_rel))
+                .and(hty_user_rels::org_id.eq(id_org))
+        )
             .select(hty_user_rels::all_columns).first::<HtyUserRels>(conn)
         {
             Ok(app) => Ok(app),

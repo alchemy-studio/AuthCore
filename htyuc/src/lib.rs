@@ -6689,7 +6689,14 @@ pub async fn raw_wx_identify2(
     }
 }
 
+fn required_current_org_id_from_auth(auth: &AuthorizationHeader) -> anyhow::Result<String> {
+    jwt_decode_token(&(*auth).clone())?
+        .current_org_id
+        .ok_or_else(|| anyhow!("current_org_id is required"))
+}
+
 async fn find_all_user_rels_by_params(_sudoer: HtySudoerTokenHeader,
+                                      auth: AuthorizationHeader,
                                       _host: HtyHostHeader,
                                       Query(params): Query<HashMap<String, String>>,
                                       conn: db::DbConn) -> Json<HtyResponse<Vec<ReqHtyUserRels>>> {
@@ -6698,7 +6705,17 @@ async fn find_all_user_rels_by_params(_sudoer: HtySudoerTokenHeader,
     let from_user_id = get_some_from_query_params::<String>("from_user_id", &params);
     let to_user_id = get_some_from_query_params::<String>("to_user_id", &params);
     debug!("find_all_user_rels_by_params -> rel_type: {:?} / from_user_id: {:?} / to_user_id: {:?}", rel_type, from_user_id, to_user_id);
-    match raw_find_all_user_rels_by_params(&rel_type, &from_user_id, &to_user_id, extract_conn(conn).deref_mut()) {
+    let current_org_id = match required_current_org_id_from_auth(&auth) {
+        Ok(value) => value,
+        Err(err) => return wrap_json_anyhow_err(err),
+    };
+    match raw_find_all_user_rels_by_params(
+        &rel_type,
+        &from_user_id,
+        &to_user_id,
+        &current_org_id,
+        extract_conn(conn).deref_mut(),
+    ) {
         Ok(ok) => wrap_json_ok_resp(ok),
         Err(e) => {
             error!("raw_find_all_user_rels_by_params -> failed to find rels, e: {}", e);
@@ -6710,9 +6727,10 @@ async fn find_all_user_rels_by_params(_sudoer: HtySudoerTokenHeader,
 fn raw_find_all_user_rels_by_params(rel_type: &Option<String>,
                                     from_user_id: &Option<String>,
                                     to_user_id: &Option<String>,
+                                    org_id: &String,
                                     conn: &mut PgConnection) -> anyhow::Result<Vec<ReqHtyUserRels>> {
     let mut res = vec![];
-    let rels = HtyUserRels::find_all_with_params(rel_type, from_user_id, to_user_id, conn)?;
+    let rels = HtyUserRels::find_all_with_params(rel_type, from_user_id, to_user_id, org_id, conn)?;
 
     debug!("raw_find_all_user_rels_by_params -> rels: {:?} / from_user_id: {:?} / to_user_id: {:?}", rels, from_user_id, to_user_id);
 
@@ -6732,9 +6750,13 @@ fn raw_find_all_user_rels_by_params(rel_type: &Option<String>,
     Ok(res)
 }
 
-async fn unlink_users(conn: db::DbConn, Json(req_user_rel): Json<ReqHtyUserRels>) -> Json<HtyResponse<()>> {
+async fn unlink_users(auth: AuthorizationHeader, conn: db::DbConn, Json(req_user_rel): Json<ReqHtyUserRels>) -> Json<HtyResponse<()>> {
     debug!("unlink_users -> starts");
-    match raw_unlink_users(req_user_rel, extract_conn(conn).deref_mut()) {
+    let current_org_id = match required_current_org_id_from_auth(&auth) {
+        Ok(value) => value,
+        Err(err) => return wrap_json_anyhow_err(err),
+    };
+    match raw_unlink_users(req_user_rel, &current_org_id, extract_conn(conn).deref_mut()) {
         Ok(ok) => wrap_json_ok_resp(ok),
         Err(e) => {
             error!("unlink_users -> failed to unlink user, e: {}", e);
@@ -6743,7 +6765,7 @@ async fn unlink_users(conn: db::DbConn, Json(req_user_rel): Json<ReqHtyUserRels>
     }
 }
 
-fn raw_unlink_users(req_user_rel: ReqHtyUserRels, conn: &mut PgConnection) -> anyhow::Result<()> {
+fn raw_unlink_users(req_user_rel: ReqHtyUserRels, org_id: &String, conn: &mut PgConnection) -> anyhow::Result<()> {
     if req_user_rel.to_user_id.is_none() || req_user_rel.from_user_id.is_none() || req_user_rel.rel_type.is_none() {
         return Err(anyhow!(HtyErr {
                     code: HtyErrCode::WebErr,
@@ -6757,7 +6779,7 @@ fn raw_unlink_users(req_user_rel: ReqHtyUserRels, conn: &mut PgConnection) -> an
     let type_rel = req_user_rel.rel_type.clone()
         .ok_or_else(|| anyhow::anyhow!("rel_type is required"))?;
 
-    let db_item = HtyUserRels::find_by_all_col(&id_from, &id_to, &type_rel, conn)?;
+    let db_item = HtyUserRels::find_by_all_col(&id_from, &id_to, &type_rel, org_id, conn)?;
     let res = HtyUserRels::delete_by_id(&db_item.id, conn);
     if res {
         Ok(())
@@ -6769,9 +6791,13 @@ fn raw_unlink_users(req_user_rel: ReqHtyUserRels, conn: &mut PgConnection) -> an
     }
 }
 
-async fn link_users(conn: db::DbConn, Json(req_user_rel): Json<ReqHtyUserRels>) -> Json<HtyResponse<()>> {
+async fn link_users(auth: AuthorizationHeader, conn: db::DbConn, Json(req_user_rel): Json<ReqHtyUserRels>) -> Json<HtyResponse<()>> {
     debug!("link_users -> starts");
-    match raw_link_users(req_user_rel, extract_conn(conn).deref_mut()) {
+    let current_org_id = match required_current_org_id_from_auth(&auth) {
+        Ok(value) => value,
+        Err(err) => return wrap_json_anyhow_err(err),
+    };
+    match raw_link_users(req_user_rel, &current_org_id, extract_conn(conn).deref_mut()) {
         Ok(ok) => wrap_json_ok_resp(ok),
         Err(e) => {
             error!("link_users -> failed to link user, e: {}", e);
@@ -6780,7 +6806,7 @@ async fn link_users(conn: db::DbConn, Json(req_user_rel): Json<ReqHtyUserRels>) 
     }
 }
 
-fn raw_link_users(req_user_rel: ReqHtyUserRels, conn: &mut PgConnection) -> anyhow::Result<()> {
+fn raw_link_users(req_user_rel: ReqHtyUserRels, org_id: &String, conn: &mut PgConnection) -> anyhow::Result<()> {
     let from_user_id = req_user_rel.from_user_id.clone()
         .ok_or_else(|| anyhow!(HtyErr {
             code: HtyErrCode::WebErr,
@@ -6801,6 +6827,7 @@ fn raw_link_users(req_user_rel: ReqHtyUserRels, conn: &mut PgConnection) -> anyh
         from_user_id,
         to_user_id,
         rel_type,
+        org_id: Some(org_id.clone()),
     };
     let _ = HtyUserRels::create(&in_item, conn)?;
     Ok(())

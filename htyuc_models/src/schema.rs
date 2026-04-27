@@ -90,9 +90,9 @@ diesel::table! {
         role_key -> Varchar,
         role_desc -> Nullable<Varchar>,
         role_status -> Varchar,
-        is_system -> Bool,
         style -> Nullable<Varchar>,
         role_name -> Nullable<Varchar>,
+        is_system -> Bool,
     }
 }
 
@@ -175,6 +175,7 @@ diesel::table! {
         from_user_id -> Varchar,
         to_user_id -> Varchar,
         rel_type -> Varchar,
+        org_id -> Nullable<Varchar>,
     }
 }
 
@@ -216,6 +217,19 @@ diesel::table! {
 }
 
 diesel::table! {
+    org_roles (id) {
+        id -> Varchar,
+        org_id -> Varchar,
+        role_id -> Varchar,
+        role_status -> Varchar,
+        created_at -> Timestamp,
+        created_by -> Nullable<Varchar>,
+        updated_at -> Nullable<Timestamp>,
+        updated_by -> Nullable<Varchar>,
+    }
+}
+
+diesel::table! {
     organizations (id) {
         id -> Varchar,
         app_id -> Varchar,
@@ -228,19 +242,6 @@ diesel::table! {
         updated_at -> Nullable<Timestamp>,
         updated_by -> Nullable<Varchar>,
         is_delete -> Bool,
-    }
-}
-
-diesel::table! {
-    org_roles (id) {
-        id -> Varchar,
-        org_id -> Varchar,
-        role_id -> Varchar,
-        role_status -> Varchar,
-        created_at -> Timestamp,
-        created_by -> Nullable<Varchar>,
-        updated_at -> Nullable<Timestamp>,
-        updated_by -> Nullable<Varchar>,
     }
 }
 
