@@ -90,9 +90,9 @@ diesel::table! {
         role_key -> Varchar,
         role_desc -> Nullable<Varchar>,
         role_status -> Varchar,
+        is_system -> Bool,
         style -> Nullable<Varchar>,
         role_name -> Nullable<Varchar>,
-        is_system -> Bool,
     }
 }
 
