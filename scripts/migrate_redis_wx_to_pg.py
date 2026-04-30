@@ -28,24 +28,24 @@ RUN_OPENID_INFO = True
 def redis_cli(*args):
     result = subprocess.run(
         ["redis-cli", "-h", REDIS_HOST, "-p", REDIS_PORT, *args],
-        capture_output=True,
-        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
         timeout=300,
     )
     if result.returncode != 0:
-        print(f"redis-cli error: {result.stderr}", file=sys.stderr)
+        print(f"redis-cli error: {result.stderr.decode()}", file=sys.stderr)
         return None
-    return result.stdout.rstrip("\n")
+    return result.stdout.decode().rstrip("\n")
 
 
 def psql_exec(db_url, sql, params=None):
     """Execute SQL via psql.  Returns stdout."""
     cmd = ["psql", db_url, "--tuples-only", "--no-align", "-c", sql]
-    result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+    result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=30)
     if result.returncode != 0:
-        print(f"psql error: {result.stderr}", file=sys.stderr)
+        print(f"psql error: {result.stderr.decode()}", file=sys.stderr)
         return None
-    return result.stdout
+    return result.stdout.decode()
 
 
 def get_all_openids_keys():
