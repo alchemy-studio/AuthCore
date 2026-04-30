@@ -80,7 +80,19 @@ def parse_openid_info_key(key):
     return suffix, ""
 
 
-def migrate_openids(db_url):
+def load_valid_app_ids(db_url):
+    """Return set of app_ids that exist in hty_apps (to skip orphans)."""
+    result = set()
+    out = psql_exec(db_url, "SELECT app_id FROM hty_apps")
+    if out:
+        for line in out.strip().splitlines():
+            line = line.strip()
+            if line:
+                result.add(line)
+    return result
+
+
+def migrate_openids(db_url, valid_app_ids):
     """Migrate HW_ALL_USER_OPENIDS_* → wx_followers."""
     keys = get_all_openids_keys()
     print(f"Found {len(keys)} ALL_USER_OPENIDS keys")
@@ -90,6 +102,10 @@ def migrate_openids(db_url):
 
     for key in keys:
         app_id = parse_openids_key(key)
+        if app_id not in valid_app_ids:
+            print(f"  SKIP {key}: app_id not found in hty_apps (orphaned)")
+            continue
+
         raw = redis_cli("GET", key)
         if not raw:
             print(f"  WARN: empty value for {key}, skipping")
@@ -122,7 +138,7 @@ def migrate_openids(db_url):
     print(f"\nTotal wx_followers migrated: {total_followers}")
 
 
-def migrate_openid_infos(db_url):
+def migrate_openid_infos(db_url, valid_app_ids):
     """Migrate HW_OPENID_INFO_* → wx_follower_infos."""
     keys = get_openid_info_keys()
     print(f"Found {len(keys)} OPENID_INFO keys")
@@ -130,10 +146,14 @@ def migrate_openid_infos(db_url):
     total_infos = 0
     now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
 
+    # Reuse valid_app_ids from hty_apps (same cache as Phase 1)
     for key in keys:
         openid, app_id = parse_openid_info_key(key)
         if not app_id:
             print(f"  WARN: could not parse app_id from {key}, skipping")
+            continue
+        if app_id not in valid_app_ids:
+            print(f"  SKIP {key}: app_id not found in hty_apps (orphaned)")
             continue
 
         raw = redis_cli("GET", key)
@@ -224,9 +244,14 @@ def main():
 
     print()
 
+    valid_app_ids = load_valid_app_ids(db_url)
+    print(f"PG: {len(valid_app_ids)} apps in hty_apps")
+
+    print()
+
     if RUN_ALL_OPENIDS:
         print("--- Phase 1: wx_followers (openid lists) ---")
-        migrate_openids(db_url)
+        migrate_openids(db_url, valid_app_ids)
         cnt = psql_exec(db_url, "SELECT count(*) FROM wx_followers")
         print(f"Verification: wx_followers has {cnt.strip()} rows")
 
@@ -234,7 +259,9 @@ def main():
 
     if RUN_OPENID_INFO:
         print("--- Phase 2: wx_follower_infos (detailed info) ---")
-        migrate_openid_infos(db_url)
+        migrate_openid_infos(db_url, valid_app_ids)
+        cnt = psql_exec(db_url, "SELECT count(*) FROM wx_follower_infos")
+        print(f"Verification: wx_follower_infos has {cnt.strip()} rows")
         cnt = psql_exec(db_url, "SELECT count(*) FROM wx_follower_infos")
         print(f"Verification: wx_follower_infos has {cnt.strip()} rows")
 
