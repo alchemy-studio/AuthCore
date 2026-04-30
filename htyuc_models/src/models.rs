@@ -28,7 +28,7 @@ use crate::schema::{
     actions_labels, app_from_to, apps_roles, hty_actions, hty_apps, hty_gonggao, hty_labels,
     hty_resources, hty_roles, hty_tag_refs, hty_tags, hty_template, hty_template_data, hty_tongzhi,
     hty_user_group, hty_users, org_members, org_roles, organizations, roles_actions, roles_labels, user_app_info,
-    user_info_roles, hty_user_rels,
+    user_info_roles, hty_user_rels, wx_follower_infos, wx_followers,
 };
 // use crate::schema::hty_resources::dsl::hty_resources;
 // use crate::schema::hty_labels::dsl::hty_labels;
@@ -2116,9 +2116,9 @@ pub struct HtyRole {
     pub role_key: String,
     pub role_desc: Option<String>,
     pub role_status: String,
-    pub is_system: bool,
     pub style: Option<String>,
     pub role_name: Option<String>,
+    pub is_system: bool,
 }
 
 impl HtyRole {
@@ -5037,4 +5037,30 @@ impl OrgRole {
             })
         })
     }
+}
+
+#[derive(Queryable, Insertable, Debug, Clone)]
+#[diesel(table_name = wx_followers)]
+pub struct WxFollower {
+    pub app_id: String,
+    pub openid: String,
+    pub refreshed_at: NaiveDateTime,
+}
+
+#[derive(Queryable, Insertable, Debug, Clone, AsChangeset)]
+#[diesel(table_name = wx_follower_infos)]
+pub struct WxFollowerInfo {
+    pub openid: String,
+    pub app_id: String,
+    pub subscribe: i32,
+    pub unionid: String,
+    pub subscribe_time: i64,
+    pub language: String,
+    pub remark: String,
+    pub groupid: i64,
+    pub tagid_list: serde_json::Value,
+    pub subscribe_scene: String,
+    pub qr_scene: i64,
+    pub qr_scene_str: String,
+    pub refreshed_at: NaiveDateTime,
 }

@@ -10,7 +10,7 @@ use axum::http::StatusCode;
 use axum::routing::get;
 use axum::{Json, Router};
 use diesel::PgConnection;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::ops::DerefMut;
 use std::sync::Arc;
 use axum::response::IntoResponse;
@@ -20,7 +20,7 @@ use tokio::task;
 use tower_http::trace::TraceLayer;
 
 use htyuc_models::models::*;
-use htyuc_models::wx::{find_wx_openid_by_unionid_and_hty_app, get_jsapi_ticket, get_or_save_wx_access_token, get_union_id_by_auth_code, push_wx_message, refresh_cache_and_get_wx_all_follower_openids};
+use htyuc_models::wx::{find_wx_openid_by_unionid_and_hty_app, get_jsapi_ticket, get_or_save_wx_access_token, get_union_id_by_auth_code, push_wx_message, refresh_cache_and_get_wx_all_follower_openids, save_wx_followers};
 use htycommons::cert::{generate_cert_key_pair, verify, HtyKeyPair};
 use htycommons::common::{current_local_datetime, get_page_and_page_size, get_some_from_query_params, HtyErr, HtyErrCode, HtyResponse, APP_STATUS_ACTIVE, APP_STATUS_DELETED, TimeUnit, extract_filename_from_url};
 use htycommons::db::{exec_read_write_task, extract_conn, fetch_db_conn, pool, DbState};
@@ -2206,7 +2206,10 @@ async fn raw_update_official_account_openid(
     let id_union = in_user.union_id.clone()
         .ok_or_else(|| anyhow::anyhow!("union_id is required"))?;
 
-    let _ = refresh_cache_and_get_wx_all_follower_openids(&to_app).await?;
+    let openids = refresh_cache_and_get_wx_all_follower_openids(&to_app).await?;
+
+    // Save fresh follower list to PostgreSQL
+    save_wx_followers(extract_conn(fetch_db_conn(&db_pool)?).deref_mut(), &to_app, &openids)?;
 
     let mut to_update_info = UserAppInfo::find_by_hty_id_and_app_id(
         &id_user,
@@ -2219,10 +2222,14 @@ async fn raw_update_official_account_openid(
         &to_update_info
     );
 
-    let resp_openid = find_wx_openid_by_unionid_and_hty_app(&id_union, &to_app).await;
+    let resp_openid = find_wx_openid_by_unionid_and_hty_app(
+        extract_conn(fetch_db_conn(&db_pool)?).deref_mut(),
+        &id_union,
+        &to_app,
+    );
 
     match resp_openid {
-        Ok(to_app_open_id) => {
+        Ok(Some(to_app_open_id)) => {
             to_update_info.openid = Some(to_app_open_id);
             to_update_info.is_registered = true;
             to_update_info.reject_reason = None;
@@ -2242,7 +2249,7 @@ async fn raw_update_official_account_openid(
                 &created_info
             );
         }
-        Err(_) => {
+        _ => {
             debug!("raw_update_official_account_openid -> UPDATE user_info / app_open_id 获取失败 / {:?}", &to_update_info);
         }
     }
@@ -5541,6 +5548,47 @@ fn raw_sudo(auth: AuthorizationHeader, conn: &mut PgConnection) -> anyhow::Resul
     }
 }
 
+fn apply_default_org_context_for_user_info(
+    token: &mut HtyToken,
+    user_info_id: &String,
+    app_id: &String,
+    conn: &mut PgConnection,
+) -> anyhow::Result<()> {
+    let members = OrgMember::find_by_user_info_id(user_info_id, conn)?;
+    let mut seen_org_ids = HashSet::new();
+    let mut default_org_id: Option<String> = None;
+    for member in members {
+        if !seen_org_ids.insert(member.org_id.clone()) {
+            continue;
+        }
+        let organization = Organization::find_by_id(&member.org_id, conn)?;
+        if organization.is_delete || organization.app_id != *app_id {
+            continue;
+        }
+        default_org_id = Some(organization.id);
+        break;
+    }
+
+    let Some(target_org_id) = default_org_id else {
+        return Ok(());
+    };
+
+    let mut org_roles =
+        OrgMember::find_roles_by_user_info_id_and_org_id(user_info_id, &target_org_id, conn)?;
+    let system_roles = OrgMember::find_system_roles_by_user_info_id(user_info_id, conn)?;
+    for system_role in system_roles {
+        if !org_roles
+            .iter()
+            .any(|existing_role| existing_role.hty_role_id == system_role.hty_role_id)
+        {
+            org_roles.push(system_role);
+        }
+    }
+    token.current_org_id = Some(target_org_id);
+    token.current_org_role_keys = Some(org_roles.into_iter().map(|role| role.role_key).collect());
+    Ok(())
+}
+
 pub async fn login_with_password(
     host: HtyHostHeader,
     State(db_pool): State<Arc<DbState>>,
@@ -5592,7 +5640,7 @@ fn raw_login_with_password(
         extract_conn(fetch_db_conn(&db_pool)?).deref_mut(),
     )?;
 
-    let resp_token = HtyToken {
+    let mut resp_token = HtyToken {
         token_id: uuid(),
         hty_id: Some(info.hty_id.clone()),
         app_id: None,
@@ -5602,6 +5650,12 @@ fn raw_login_with_password(
         current_org_id: None,
         current_org_role_keys: None,
     };
+    let _ = apply_default_org_context_for_user_info(
+        &mut resp_token,
+        &info.id,
+        &app.app_id,
+        extract_conn(fetch_db_conn(&db_pool)?).deref_mut(),
+    );
 
     return if info.password == req_login.password {
         save_token_with_exp_days(&resp_token, get_token_expiration_days()?)?;
@@ -5700,7 +5754,7 @@ async fn raw_wx_qr_login(code: String, app_domain: String, db_pool: Arc<DbState>
     }
     debug!("raw_wx_qr_login -> this_app_user_info: {:?}", &this_app_user_info);
 
-    let resp_token = HtyToken {
+    let mut resp_token = HtyToken {
         token_id: uuid(),
         hty_id: Some(user.hty_id.clone()),
         app_id: Some(app.app_id.clone()),
@@ -5710,6 +5764,12 @@ async fn raw_wx_qr_login(code: String, app_domain: String, db_pool: Arc<DbState>
         current_org_id: None,
         current_org_role_keys: None,
     };
+    apply_default_org_context_for_user_info(
+        &mut resp_token,
+        &this_app_user_info.id,
+        &app.app_id,
+        extract_conn(fetch_db_conn(&db_pool)?).deref_mut(),
+    )?;
 
     debug!("raw_wx_qr_login -> resp_token: {:?}", &resp_token);
 
@@ -5926,19 +5986,27 @@ fn raw_login2_with_unionid_tx(
 
                 let login_user = ok_user?;
 
-                let token = match from_app.clone() {
-                    Some(some_app) => HtyToken {
+                let mut token = match from_app.clone() {
+                    Some(some_app) => {
+                        let login_user_info = login_user.info(&some_app.app_id, conn)?;
+                        let mut login_token = HtyToken {
                         token_id: uuid(),
                         hty_id: Some(login_user.hty_id.clone()),
                         app_id: Some(some_app.app_id.clone()),
                         ts: current_local_datetime(),
-                        roles: login_user
-                            .info(&some_app.app_id, conn)?
-                            .req_roles_by_id(conn)?,
+                        roles: login_user_info.req_roles_by_id(conn)?,
                         tags: None,
                         current_org_id: None,
                         current_org_role_keys: None,
-                    },
+                    };
+                        apply_default_org_context_for_user_info(
+                            &mut login_token,
+                            &login_user_info.id,
+                            &some_app.app_id,
+                            conn,
+                        )?;
+                        login_token
+                    }
                     None => HtyToken {
                         token_id: uuid(),
                         hty_id: Some(login_user.hty_id.clone()),
@@ -6218,10 +6286,19 @@ async fn raw_refresh_openid(
     } else {
         debug!("refresh_openid() openid -> {:?}", the_app);
 
-        let _ = refresh_cache_and_get_wx_all_follower_openids(&the_app).await?;
+        let openids = refresh_cache_and_get_wx_all_follower_openids(&the_app).await?;
+        save_wx_followers(extract_conn(fetch_db_conn(&db_pool)?).deref_mut(), &the_app, &openids)?;
 
         if user_app_info.openid.is_none() {
-            let my_openid = find_wx_openid_by_unionid_and_hty_app(&union_id, &the_app).await?;
+            let my_openid = find_wx_openid_by_unionid_and_hty_app(
+                extract_conn(fetch_db_conn(&db_pool)?).deref_mut(),
+                &union_id,
+                &the_app,
+            )?
+            .ok_or_else(|| HtyErr {
+                code: HtyErrCode::NullErr,
+                reason: Some(format!("这个用户没有对应TO_APP的OPENID！此用户UNIONID: {:?}", union_id)),
+            })?;
             out_openid = my_openid.clone();
 
             let to_update_user_app_info = UserAppInfo {

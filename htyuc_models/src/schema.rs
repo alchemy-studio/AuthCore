@@ -90,9 +90,9 @@ diesel::table! {
         role_key -> Varchar,
         role_desc -> Nullable<Varchar>,
         role_status -> Varchar,
-        is_system -> Bool,
         style -> Nullable<Varchar>,
         role_name -> Nullable<Varchar>,
+        is_system -> Bool,
     }
 }
 
@@ -288,6 +288,32 @@ diesel::table! {
     }
 }
 
+diesel::table! {
+    wx_follower_infos (openid, app_id) {
+        openid -> Varchar,
+        app_id -> Varchar,
+        subscribe -> Int4,
+        unionid -> Varchar,
+        subscribe_time -> Int8,
+        language -> Varchar,
+        remark -> Varchar,
+        groupid -> Int8,
+        tagid_list -> Jsonb,
+        subscribe_scene -> Varchar,
+        qr_scene -> Int8,
+        qr_scene_str -> Varchar,
+        refreshed_at -> Timestamp,
+    }
+}
+
+diesel::table! {
+    wx_followers (app_id, openid) {
+        app_id -> Varchar,
+        openid -> Varchar,
+        refreshed_at -> Timestamp,
+    }
+}
+
 diesel::joinable!(actions_labels -> hty_actions (action_id));
 diesel::joinable!(actions_labels -> hty_labels (label_id));
 diesel::joinable!(apps_roles -> hty_apps (app_id));
@@ -315,6 +341,8 @@ diesel::joinable!(user_app_info -> hty_apps (app_id));
 diesel::joinable!(user_app_info -> hty_users (hty_id));
 diesel::joinable!(user_info_roles -> hty_roles (role_id));
 diesel::joinable!(user_info_roles -> user_app_info (user_info_id));
+diesel::joinable!(wx_follower_infos -> hty_apps (app_id));
+diesel::joinable!(wx_followers -> hty_apps (app_id));
 
 diesel::allow_tables_to_appear_in_same_query!(
     actions_labels,
@@ -342,4 +370,6 @@ diesel::allow_tables_to_appear_in_same_query!(
     roles_labels,
     user_app_info,
     user_info_roles,
+    wx_follower_infos,
+    wx_followers,
 );

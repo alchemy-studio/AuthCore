@@ -12,8 +12,6 @@ pub const WX_JSAPI_TICKET_PREFIX: &str = "WX_JSAPI_TICKET_";
 pub const HTY_REDIS_KEY_PREFIX: &str = "HW_";
 pub const TOKEN_PREFIX: &str = "T_";
 pub const LOGIN_UNION_ID_PREFIX: &str = "LOGIN_UNION_ID_";
-pub const ALL_USER_OPENIDS: &str = "ALL_USER_OPENIDS_";
-pub const OPENID_INFO: &str = "OPENID_INFO_";
 pub const CACHED: &str = "C_";
 
 
@@ -257,10 +255,3 @@ pub fn del_some_from_redis(key: &String) -> anyhow::Result<Option<()>> {
     Ok(Some(()))
 }
 
-pub fn all_openids_prefix(app_id: &String) -> String {
-    format!("{}{}", &ALL_USER_OPENIDS.to_string(), app_id)
-}
-
-pub fn openid_info_prefix(openid: &String, appid: &String) -> String {
-    format!("{}{}_{}", &OPENID_INFO.to_string(), openid, appid)
-}

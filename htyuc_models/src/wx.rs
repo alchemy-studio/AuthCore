@@ -4,13 +4,13 @@ use std::future::Future;
 // use std::pin::Pin;
 // use std::pin::Pin;
 use anyhow::anyhow;
-use crate::models::{HtyUser, UserAppInfo, HtyApp, ReqHtyTemplate, HtyTemplateData};
-use diesel::PgConnection;
+use crate::models::{HtyUser, UserAppInfo, HtyApp, ReqHtyTemplate, HtyTemplateData, WxFollower, WxFollowerInfo};
+use diesel::{ExpressionMethods, PgConnection, QueryDsl, RunQueryDsl, OptionalExtension};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 use tracing::debug;
 use htycommons::uuid;
-use htycommons::redis_util::{all_openids_prefix, get_value_from_redis, is_key_exist_in_redis, openid_info_prefix, save_kv_to_redis, save_kv_to_redis_with_exp_secs, WX_ACCESS_TOKEN_PREFIX, WX_JSAPI_TICKET_PREFIX};
+use htycommons::redis_util::{get_value_from_redis, is_key_exist_in_redis, save_kv_to_redis_with_exp_secs, WX_ACCESS_TOKEN_PREFIX, WX_JSAPI_TICKET_PREFIX};
 use htycommons::web::{HtyToken, skip_wx_push};
 use htycommons::common::{current_local_datetime, HtyErr, HtyErrCode};
 use htycommons::wx::{ReqWxAccessToken, ReqWxAccessToken1, ReqWxAllFollowers, ReqWxFollowerInfo, ReqWxPushMessage, ReqWxPushResponse, ReqWxTicket, WxId};
@@ -185,8 +185,13 @@ pub async fn get_jsapi_ticket(app: &HtyApp) -> anyhow::Result<String> {
         .ok_or_else(|| anyhow::anyhow!("Failed to get jsapi_ticket"))
 }
 
-pub async fn get_cached_wx_all_follower_openids(app: &HtyApp) -> anyhow::Result<Vec<String>> {
-    Ok(serde_json::from_str::<Vec<String>>(get_value_from_redis(&all_openids_prefix(&app.app_id))?.as_str())?)
+pub fn get_wx_followers_from_db(conn: &mut PgConnection, app: &HtyApp) -> anyhow::Result<Vec<String>> {
+    use crate::schema::wx_followers::dsl as wx_dsl;
+    let rows = wx_dsl::wx_followers
+        .filter(wx_dsl::app_id.eq(&app.app_id))
+        .select(wx_dsl::openid)
+        .load::<String>(conn)?;
+    Ok(rows)
 }
 
 pub async fn refresh_cache_and_get_wx_all_follower_openids(app: &HtyApp) -> anyhow::Result<Vec<String>> {
@@ -197,7 +202,7 @@ pub async fn refresh_cache_and_get_wx_all_follower_openids(app: &HtyApp) -> anyh
         .ok_or_else(|| anyhow::anyhow!("Failed to get follower openids"))
 }
 
-pub async fn fn_refresh_cache_and_get_wx_all_follower_openids<T: Send + Clone + Serialize + Debug>(app: Option<HtyApp>,
+pub async fn fn_refresh_cache_and_get_wx_all_follower_openids<T: Send + Clone + Serialize + Debug>(_app: Option<HtyApp>,
                                                                                                    _: Option<ReqWxPushMessage<T>>,
                                                                                                    _: Option<String>,
                                                                                                    token: String) -> anyhow::Result<(Option<Vec<String>>, Option<i32>, Option<String>)> {
@@ -217,10 +222,6 @@ pub async fn fn_refresh_cache_and_get_wx_all_follower_openids<T: Send + Clone + 
         debug!("get_wx_all_followers -> get resp from weixin {:?}", req_followers);
         let openids = req_followers.data.openid
             .ok_or_else(|| anyhow::anyhow!("openid is missing in response"))?;
-        let json_openids = serde_json::to_string(&openids)?;
-        let app_ref = app.as_ref()
-            .ok_or_else(|| anyhow::anyhow!("app is required"))?;
-        let _ = save_kv_to_redis(&all_openids_prefix(&app_ref.app_id), &json_openids)?;
         Ok((Some(openids), req_followers.errcode.clone(), req_followers.errmsg.clone()))
     } else {
         let resp_body = resp.text().await?;
@@ -232,14 +233,60 @@ pub async fn fn_refresh_cache_and_get_wx_all_follower_openids<T: Send + Clone + 
 }
 
 
-pub async fn get_cached_wx_follower_info(openid: &String, app: &HtyApp) -> anyhow::Result<ReqWxFollowerInfo> {
-    let info = serde_json::from_str::<ReqWxFollowerInfo>(get_value_from_redis(&openid_info_prefix(openid, &app.app_id))?.as_str())?;
-    debug!("get_cached_wx_follower_info -> OPENID {:?} / APP {:?} / INFO {:?}", openid, app, info);
-    Ok(info)
+pub fn save_wx_followers(conn: &mut PgConnection, app: &HtyApp, follower_openids: &[String]) -> anyhow::Result<()> {
+    let now = current_local_datetime();
+    for oid in follower_openids {
+        let row = WxFollower {
+            app_id: app.app_id.clone(),
+            openid: oid.clone(),
+            refreshed_at: now,
+        };
+        diesel::insert_into(crate::schema::wx_followers::table)
+            .values(&row)
+            .on_conflict((
+                crate::schema::wx_followers::dsl::app_id,
+                crate::schema::wx_followers::dsl::openid,
+            ))
+            .do_update()
+            .set(crate::schema::wx_followers::dsl::refreshed_at.eq(now))
+            .execute(conn)?;
+    }
+    Ok(())
+}
+
+pub fn save_wx_follower_infos(conn: &mut PgConnection, app: &HtyApp, infos: &[ReqWxFollowerInfo]) -> anyhow::Result<()> {
+    let now = current_local_datetime();
+    for info in infos {
+        let row = WxFollowerInfo {
+            openid: info.openid.clone(),
+            app_id: app.app_id.clone(),
+            subscribe: info.subscribe as i32,
+            unionid: info.unionid.clone(),
+            subscribe_time: info.subscribe_time as i64,
+            language: info.language.clone(),
+            remark: info.remark.clone(),
+            groupid: info.groupid as i64,
+            tagid_list: serde_json::json!(info.tagid_list),
+            subscribe_scene: info.subscribe_scene.clone(),
+            qr_scene: info.qr_scene as i64,
+            qr_scene_str: info.qr_scene_str.clone(),
+            refreshed_at: now,
+        };
+        diesel::insert_into(crate::schema::wx_follower_infos::table)
+            .values(&row)
+            .on_conflict((
+                crate::schema::wx_follower_infos::dsl::openid,
+                crate::schema::wx_follower_infos::dsl::app_id,
+            ))
+            .do_update()
+            .set(&row)
+            .execute(conn)?;
+    }
+    Ok(())
 }
 
 pub async fn fn_refresh_and_get_wx_follower_info<T: Send + Clone + Serialize + Debug>(
-    app: Option<HtyApp>,
+    _app: Option<HtyApp>,
     _: Option<ReqWxPushMessage<T>>,
     openid: Option<String>,
     token: String) -> anyhow::Result<(Option<ReqWxFollowerInfo>, Option<i32>, Option<String>)> {
@@ -265,11 +312,6 @@ pub async fn fn_refresh_and_get_wx_follower_info<T: Send + Clone + Serialize + D
 
         debug!("fn_refresh_and_get_wx_follower_info -> get follower info {:?}", req_follower_info);
 
-        let app_ref = app.as_ref()
-            .ok_or_else(|| anyhow::anyhow!("app is required"))?;
-        let _ = save_kv_to_redis(&openid_info_prefix(&req_follower_info.clone().openid, &app_ref.app_id),
-                                 &json_follower_info.to_string())?;
-
         Ok((Some(req_follower_info.clone()), req_follower_info.errcode.clone(), req_follower_info.errmsg.clone()))
     } else {
         let resp_body = resp.text().await?;
@@ -287,39 +329,15 @@ pub async fn refresh_and_get_wx_follower_info(openid: &String, app: &HtyApp) -> 
 }
 
 
-pub async fn get_cached_or_refresh_wx_follower_info(openid: &String, app: &HtyApp) -> anyhow::Result<ReqWxFollowerInfo> {
-    // 如果有缓存数据，直接使用；如果没有，刷新缓存并返回。
-    debug!("get_cached_or_refresh_wx_follower_info start");
-    match get_cached_wx_follower_info(openid, app).await {
-        Ok(info) =>
-            {
-                debug!("get_cached_or_refresh_wx_follower_info FOUND CACHE INFO -> {:?}", info);
-                Ok(info)
-            }
-        Err(_) => {
-            debug!("get_cached_or_refresh_wx_follower_info NOT FOUND CACHE INFO, fetch from WX");
-            refresh_and_get_wx_follower_info(openid, app).await
-        }
-    }
-}
-
-pub async fn find_wx_openid_by_unionid_and_hty_app(union_id: &String, app: &HtyApp) -> anyhow::Result<String> {
-    let follower_openids = get_cached_wx_all_follower_openids(&app).await?;
-    let mut follower_infos = vec![];
-
-    for follower_openid in follower_openids {
-        follower_infos.push(get_cached_or_refresh_wx_follower_info(&follower_openid, &app).await?);
-    }
-
-    let res_follower_info = follower_infos
-        .into_iter()
-        .find(|follower_info| follower_info.unionid == union_id.clone())
-        .ok_or(HtyErr {
-            code: HtyErrCode::NullErr,
-            reason: Some(format!("这个用户没有对应TO_APP的OPENID！此用户UNIONID: {:?}", union_id)),
-        })?;
-
-    Ok(res_follower_info.openid)
+pub fn find_wx_openid_by_unionid_and_hty_app(conn: &mut PgConnection, union_id: &String, app: &HtyApp) -> anyhow::Result<Option<String>> {
+    use crate::schema::wx_follower_infos::dsl as wfi_dsl;
+    let result = wfi_dsl::wx_follower_infos
+        .filter(wfi_dsl::app_id.eq(&app.app_id))
+        .filter(wfi_dsl::unionid.eq(union_id))
+        .select(wfi_dsl::openid)
+        .first::<String>(conn)
+        .optional()?;
+    Ok(result)
 }
 
 //
