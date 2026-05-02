@@ -548,6 +548,7 @@ pub struct HtyToken {
     pub tags: Option<Vec<ReqHtyTag>>,
     pub current_org_id: Option<String>,
     pub current_org_role_keys: Option<Vec<String>>,
+    pub current_department_id: Option<String>,
 }
 
 impl HtyToken {

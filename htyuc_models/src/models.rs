@@ -25,7 +25,7 @@ use htycommons::models::*;
 // use tracing_subscriber::filter::FilterExt;
 // use htycommons::logger::debug;
 use crate::schema::{
-    actions_labels, app_from_to, apps_roles, hty_actions, hty_apps, hty_gonggao, hty_labels,
+    actions_labels, app_from_to, apps_roles, department_members, departments, hty_actions, hty_apps, hty_gonggao, hty_labels,
     hty_resources, hty_roles, hty_tag_refs, hty_tags, hty_template, hty_template_data, hty_tongzhi,
     hty_user_group, hty_users, org_members, org_roles, organizations, roles_actions, roles_labels, user_app_info,
     user_info_roles, hty_user_rels, wx_follower_infos, wx_followers,
@@ -4944,6 +4944,313 @@ impl OrgMember {
             })
     }
 }
+
+// ---------------------------------------------------------------------------
+// Department
+// ---------------------------------------------------------------------------
+
+#[derive(
+Identifiable,
+PartialEq,
+Serialize,
+Deserialize,
+Queryable,
+Insertable,
+Debug,
+Clone,
+AsChangeset,
+)]
+#[diesel(table_name = departments)]
+#[diesel(primary_key(id))]
+pub struct Department {
+    pub id: String,
+    pub org_id: String,
+    pub dept_name: String,
+    pub dept_desc: Option<String>,
+    pub supervisor_user_info_id: Option<String>,
+    pub is_default: bool,
+    pub dept_status: String,
+    pub created_at: NaiveDateTime,
+    pub created_by: Option<String>,
+    pub updated_at: Option<NaiveDateTime>,
+    pub updated_by: Option<String>,
+    pub is_delete: bool,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+pub struct ReqDepartment {
+    pub id: Option<String>,
+    pub org_id: Option<String>,
+    pub dept_name: Option<String>,
+    pub dept_desc: Option<String>,
+    pub supervisor_user_info_id: Option<String>,
+    pub is_default: Option<bool>,
+    pub dept_status: Option<String>,
+    pub created_by: Option<String>,
+    pub updated_by: Option<String>,
+    pub is_delete: Option<bool>,
+}
+
+impl Department {
+    pub fn create(entry: &Department, conn: &mut PgConnection) -> anyhow::Result<Department> {
+        use crate::schema::departments::dsl::*;
+        insert_into(departments).values(entry).get_result(conn).map_err(|e| {
+            anyhow!(HtyErr {
+                code: HtyErrCode::DbErr,
+                reason: Some(e.to_string()),
+            })
+        })
+    }
+
+    pub fn update(entry: &Department, conn: &mut PgConnection) -> anyhow::Result<Department> {
+        diesel::update(departments::table)
+            .filter(departments::id.eq(entry.id.clone()))
+            .set(entry)
+            .get_result(conn)
+            .map_err(|e| {
+                anyhow!(HtyErr {
+                    code: HtyErrCode::DbErr,
+                    reason: Some(e.to_string()),
+                })
+            })
+    }
+
+    pub fn find_by_id(id_dept: &String, conn: &mut PgConnection) -> anyhow::Result<Department> {
+        use crate::schema::departments::dsl::*;
+        departments
+            .filter(id.eq(id_dept))
+            .filter(is_delete.eq(false))
+            .first::<Department>(conn)
+            .map_err(|e| {
+                anyhow!(HtyErr {
+                    code: HtyErrCode::DbErr,
+                    reason: Some(e.to_string()),
+                })
+            })
+    }
+
+    pub fn find_default_by_org_id(
+        id_org: &String,
+        conn: &mut PgConnection,
+    ) -> anyhow::Result<Department> {
+        use crate::schema::departments::dsl::*;
+        departments
+            .filter(org_id.eq(id_org))
+            .filter(is_default.eq(true))
+            .filter(is_delete.eq(false))
+            .filter(dept_status.eq("ACTIVE"))
+            .first::<Department>(conn)
+            .map_err(|e| {
+                anyhow!(HtyErr {
+                    code: HtyErrCode::DbErr,
+                    reason: Some(e.to_string()),
+                })
+            })
+    }
+
+    pub fn find_all_by_org_id(
+        id_org: &String,
+        conn: &mut PgConnection,
+    ) -> anyhow::Result<Vec<Department>> {
+        use crate::schema::departments::dsl::*;
+        departments
+            .filter(org_id.eq(id_org))
+            .filter(is_delete.eq(false))
+            .filter(dept_status.eq("ACTIVE"))
+            .order_by(created_at.asc())
+            .load::<Department>(conn)
+            .map_err(|e| {
+                anyhow!(HtyErr {
+                    code: HtyErrCode::DbErr,
+                    reason: Some(e.to_string()),
+                })
+            })
+    }
+
+    pub fn soft_delete_by_id(
+        id_dept: &String,
+        updated_by_user: &Option<String>,
+        conn: &mut PgConnection,
+    ) -> anyhow::Result<Department> {
+        diesel::update(departments::table.filter(departments::id.eq(id_dept)))
+            .set((
+                departments::is_delete.eq(true),
+                departments::updated_at.eq(Some(current_local_datetime())),
+                departments::updated_by.eq(updated_by_user.clone()),
+            ))
+            .get_result(conn)
+            .map_err(|e| {
+                anyhow!(HtyErr {
+                    code: HtyErrCode::DbErr,
+                    reason: Some(e.to_string()),
+                })
+            })
+    }
+}
+
+// ---------------------------------------------------------------------------
+// DepartmentMember
+// ---------------------------------------------------------------------------
+
+#[derive(
+Identifiable,
+PartialEq,
+Associations,
+Serialize,
+Deserialize,
+Queryable,
+Debug,
+Insertable,
+Clone,
+AsChangeset,
+)]
+#[diesel(table_name = department_members)]
+#[diesel(primary_key(id))]
+#[diesel(belongs_to(Department, foreign_key = department_id))]
+#[diesel(belongs_to(Organization, foreign_key = org_id))]
+#[diesel(belongs_to(UserAppInfo, foreign_key = user_info_id))]
+pub struct DepartmentMember {
+    pub id: String,
+    pub department_id: String,
+    pub org_id: String,
+    pub user_info_id: String,
+    pub member_status: String,
+    pub joined_at: NaiveDateTime,
+    pub created_at: NaiveDateTime,
+    pub created_by: Option<String>,
+    pub updated_at: Option<NaiveDateTime>,
+    pub updated_by: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+pub struct ReqDepartmentMember {
+    pub id: Option<String>,
+    pub department_id: Option<String>,
+    pub org_id: Option<String>,
+    pub user_info_id: Option<String>,
+    pub member_status: Option<String>,
+    pub created_by: Option<String>,
+}
+
+impl DepartmentMember {
+    pub fn create(entry: &DepartmentMember, conn: &mut PgConnection) -> anyhow::Result<DepartmentMember> {
+        use crate::schema::department_members::dsl::*;
+        insert_into(department_members).values(entry).get_result(conn).map_err(|e| {
+            anyhow!(HtyErr {
+                code: HtyErrCode::DbErr,
+                reason: Some(e.to_string()),
+            })
+        })
+    }
+
+    pub fn update(entry: &DepartmentMember, conn: &mut PgConnection) -> anyhow::Result<DepartmentMember> {
+        diesel::update(department_members::table)
+            .filter(department_members::id.eq(entry.id.clone()))
+            .set(entry)
+            .get_result(conn)
+            .map_err(|e| {
+                anyhow!(HtyErr {
+                    code: HtyErrCode::DbErr,
+                    reason: Some(e.to_string()),
+                })
+            })
+    }
+
+    pub fn find_by_department_id(
+        id_dept: &String,
+        conn: &mut PgConnection,
+    ) -> anyhow::Result<Vec<DepartmentMember>> {
+        use crate::schema::department_members::dsl::*;
+        department_members
+            .filter(department_id.eq(id_dept))
+            .filter(member_status.eq("ACTIVE"))
+            .load::<DepartmentMember>(conn)
+            .map_err(|e| {
+                anyhow!(HtyErr {
+                    code: HtyErrCode::DbErr,
+                    reason: Some(e.to_string()),
+                })
+            })
+    }
+
+    pub fn find_by_user_info_id(
+        id_user_info: &String,
+        conn: &mut PgConnection,
+    ) -> anyhow::Result<Vec<DepartmentMember>> {
+        use crate::schema::department_members::dsl::*;
+        department_members
+            .filter(user_info_id.eq(id_user_info))
+            .filter(member_status.eq("ACTIVE"))
+            .load::<DepartmentMember>(conn)
+            .map_err(|e| {
+                anyhow!(HtyErr {
+                    code: HtyErrCode::DbErr,
+                    reason: Some(e.to_string()),
+                })
+            })
+    }
+
+    pub fn find_by_department_id_and_user_info_id(
+        id_dept: &String,
+        id_user_info: &String,
+        conn: &mut PgConnection,
+    ) -> anyhow::Result<Option<DepartmentMember>> {
+        use crate::schema::department_members::dsl::*;
+        department_members
+            .filter(department_id.eq(id_dept))
+            .filter(user_info_id.eq(id_user_info))
+            .filter(member_status.eq("ACTIVE"))
+            .first::<DepartmentMember>(conn)
+            .optional()
+            .map_err(|e| {
+                anyhow!(HtyErr {
+                    code: HtyErrCode::DbErr,
+                    reason: Some(e.to_string()),
+                })
+            })
+    }
+
+    pub fn delete_by_department_id_and_user_info_id(
+        id_dept: &String,
+        id_user_info: &String,
+        conn: &mut PgConnection,
+    ) -> anyhow::Result<usize> {
+        use crate::schema::department_members::dsl::*;
+        diesel::delete(
+            department_members
+                .filter(department_id.eq(id_dept))
+                .filter(user_info_id.eq(id_user_info))
+                .filter(member_status.eq("ACTIVE")),
+        )
+        .execute(conn)
+        .map_err(|e| {
+            anyhow!(HtyErr {
+                code: HtyErrCode::DbErr,
+                reason: Some(e.to_string()),
+            })
+        })
+    }
+
+    pub fn count_active_by_department_id(
+        id_dept: &String,
+        conn: &mut PgConnection,
+    ) -> anyhow::Result<i64> {
+        use crate::schema::department_members::dsl::*;
+        department_members
+            .filter(department_id.eq(id_dept))
+            .filter(member_status.eq("ACTIVE"))
+            .count()
+            .get_result(conn)
+            .map_err(|e| {
+                anyhow!(HtyErr {
+                    code: HtyErrCode::DbErr,
+                    reason: Some(e.to_string()),
+                })
+            })
+    }
+}
+
+// ---------------------------------------------------------------------------
 
 #[derive(
 Identifiable,

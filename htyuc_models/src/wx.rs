@@ -34,6 +34,7 @@ pub fn identify2(id: &WxId, app_id: &String, conn: &mut PgConnection) -> anyhow:
                 tags: None,
                 current_org_id: None,
                 current_org_role_keys: None,
+                current_department_id: None,
             })
         }
         Err(_) => {
@@ -77,6 +78,7 @@ pub fn identify2(id: &WxId, app_id: &String, conn: &mut PgConnection) -> anyhow:
                 tags: None,
                 current_org_id: None,
                 current_org_role_keys: None,
+                current_department_id: None,
             })
         }
     }

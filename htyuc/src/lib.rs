@@ -5472,6 +5472,7 @@ fn raw_sudo2(auth: AuthorizationHeader, host: HtyHostHeader, to_user_id: String,
             tags: None,
             current_org_id: decoded_auth_token.current_org_id.clone(),
             current_org_role_keys: decoded_auth_token.current_org_role_keys.clone(),
+            current_department_id: decoded_auth_token.current_department_id.clone(),
         };
         save_token_with_exp_days(&resp_token, get_token_expiration_days()?)?;
         Ok(jwt_encode_token(resp_token)?)
@@ -5528,6 +5529,7 @@ fn raw_sudo(auth: AuthorizationHeader, conn: &mut PgConnection) -> anyhow::Resul
                 tags: None,
                 current_org_id: decoded_auth_token.current_org_id.clone(),
                 current_org_role_keys: decoded_auth_token.current_org_role_keys.clone(),
+                current_department_id: decoded_auth_token.current_department_id.clone(),
             };
 
             //Save sudoer token
@@ -5649,6 +5651,7 @@ fn raw_login_with_password(
         tags: None,
         current_org_id: None,
         current_org_role_keys: None,
+            current_department_id: None,
     };
     let _ = apply_default_org_context_for_user_info(
         &mut resp_token,
@@ -5763,6 +5766,7 @@ async fn raw_wx_qr_login(code: String, app_domain: String, db_pool: Arc<DbState>
         tags: None,
         current_org_id: None,
         current_org_role_keys: None,
+            current_department_id: None,
     };
     apply_default_org_context_for_user_info(
         &mut resp_token,
@@ -5998,6 +6002,7 @@ fn raw_login2_with_unionid_tx(
                         tags: None,
                         current_org_id: None,
                         current_org_role_keys: None,
+            current_department_id: None,
                     };
                         apply_default_org_context_for_user_info(
                             &mut login_token,
@@ -6016,6 +6021,7 @@ fn raw_login2_with_unionid_tx(
                         tags: None,
                         current_org_id: None,
                         current_org_role_keys: None,
+            current_department_id: None,
                     },
                 };
 
@@ -6574,6 +6580,7 @@ fn raw_login_with_cert(
                 tags: None,
                 current_org_id: None,
                 current_org_role_keys: None,
+            current_department_id: None,
             };
 
             save_token_with_exp_days(&resp_token, get_token_expiration_days()?)?;
@@ -7327,6 +7334,8 @@ pub fn uc_rocket(db_url: &str) -> Router {
         .route("/api/v1/uc/org/switch", post(ws_org::switch_org))
         .route("/api/v1/uc/org/save_homepage", post(ws_org::save_org_homepage))
         .route("/api/v1/uc/org/homepage/{org_id}", get(ws_org::get_org_homepage))
+        .route("/api/v1/uc/org/departments/my", get(ws_org::my_departments))
+        .route("/api/v1/uc/org/department/switch", post(ws_org::switch_department))
         .layer(TraceLayer::new_for_http())
         .with_state(shared_db_state);
 

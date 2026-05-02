@@ -10,7 +10,8 @@ use htycommons::web::{
     HtyHostHeader, ReqOrgMember, ReqOrgRole, ReqOrganization, ReqOrgSwitch,
 };
 use htycommons::uuid;
-use htyuc_models::models::{HtyApp, HtyRole, OrgMember, OrgRole, Organization, UserAppInfo};
+use htyuc_models::models::{Department, DepartmentMember, HtyApp, HtyRole, OrgMember, OrgRole, Organization, UserAppInfo};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::ops::DerefMut;
@@ -59,12 +60,30 @@ pub async fn create_org(
             homepage_md: body.homepage_md,
             org_status: body.org_status.unwrap_or_else(|| "ACTIVE".to_string()),
             created_at: now,
-            created_by: body.created_by,
+            created_by: body.created_by.clone(),
             updated_at: None,
             updated_by: None,
             is_delete: body.is_delete.unwrap_or(false),
         };
-        Organization::create(&new_org, conn)
+        let org = Organization::create(&new_org, conn)?;
+        // auto-create default department
+        let dept_id = uuid();
+        let default_dept = Department {
+            id: dept_id.clone(),
+            org_id: org.id.clone(),
+            dept_name: "默认部门".to_string(),
+            dept_desc: None,
+            supervisor_user_info_id: None,
+            is_default: true,
+            dept_status: "ACTIVE".to_string(),
+            created_at: now,
+            created_by: body.created_by,
+            updated_at: None,
+            updated_by: None,
+            is_delete: false,
+        };
+        Department::create(&default_dept, conn)?;
+        Ok(org)
     })();
     match result {
         Ok(ok) => wrap_json_ok_resp(ok),
@@ -374,12 +393,20 @@ pub async fn switch_org(
                 org_roles.push(system_role);
             }
         }
+        // auto-select default department if only one active department
+        let departments = Department::find_all_by_org_id(&target_org_id, conn)?;
+        let dept_id = if departments.len() == 1 {
+            departments.into_iter().next().map(|d| d.id)
+        } else {
+            None
+        };
         apply_org_context_to_token(
             &mut token,
             target_org_id,
             org_roles.into_iter().map(|role| role.role_key).collect(),
             uuid(),
         );
+        token.current_department_id = dept_id;
         save_token_with_exp_days(&token, get_token_expiration_days()?)?;
         jwt_encode_token(token).map_err(|e| anyhow!(e))
     })();
@@ -407,6 +434,7 @@ mod tests {
             tags: None,
             current_org_id: None,
             current_org_role_keys: None,
+            current_department_id: None,
         };
 
         apply_org_context_to_token(
@@ -462,6 +490,78 @@ pub async fn get_org_homepage(
             )?
             .homepage_md,
         )
+    })();
+    match result {
+        Ok(ok) => wrap_json_ok_resp(ok),
+        Err(e) => wrap_json_anyhow_err(e),
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Department APIs
+// ---------------------------------------------------------------------------
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ReqDeptSwitch {
+    pub department_id: Option<String>,
+}
+
+/// GET /api/v1/uc/org/departments/my
+/// Returns active departments for the current org.
+pub async fn my_departments(
+    auth: AuthorizationHeader,
+    State(db_pool): State<Arc<DbState>>,
+) -> Json<HtyResponse<Vec<Department>>> {
+    let result = (|| -> anyhow::Result<Vec<Department>> {
+        let token = jwt_decode_token(&(*auth).clone())?;
+        let org_id = token.current_org_id.ok_or_else(|| anyhow!("no current_org_id in token"))?;
+        let mut conn_holder = extract_conn(fetch_db_conn(&db_pool)?);
+        let conn = conn_holder.deref_mut();
+        Department::find_all_by_org_id(&org_id, conn)
+    })();
+    match result {
+        Ok(ok) => wrap_json_ok_resp(ok),
+        Err(e) => wrap_json_anyhow_err(e),
+    }
+}
+
+/// POST /api/v1/uc/org/department/switch
+pub async fn switch_department(
+    auth: AuthorizationHeader,
+    State(db_pool): State<Arc<DbState>>,
+    Json(req): Json<ReqDeptSwitch>,
+) -> Json<HtyResponse<String>> {
+    let result = (|| -> anyhow::Result<String> {
+        let dept_id = req.department_id.ok_or_else(|| anyhow!("department_id is required"))?;
+        let mut token = jwt_decode_token(&(*auth).clone())?;
+        let mut conn_holder = extract_conn(fetch_db_conn(&db_pool)?);
+        let conn = conn_holder.deref_mut();
+
+        let dept = Department::find_by_id(&dept_id, conn)?;
+        let current_org = token.current_org_id.as_ref().ok_or_else(|| anyhow!("no current_org_id in token"))?;
+        if dept.org_id != *current_org {
+            return Err(anyhow!(HtyErr {
+                code: HtyErrCode::WebErr,
+                reason: Some("department does not belong to current org".to_string()),
+            }));
+        }
+
+        let user_hty_id = token.hty_id.as_ref().ok_or_else(|| anyhow!("hty_id required in token"))?;
+        let user_app_id = token.app_id.as_ref().ok_or_else(|| anyhow!("app_id required in token"))?;
+        let user_info = UserAppInfo::find_by_hty_id_and_app_id(user_hty_id, user_app_id, conn)?;
+        let membership = DepartmentMember::find_by_department_id_and_user_info_id(&dept_id, &user_info.id, conn)?;
+        if membership.is_none() {
+            return Err(anyhow!(HtyErr {
+                code: HtyErrCode::AuthenticationFailed,
+                reason: Some("user is not a member of this department".to_string()),
+            }));
+        }
+
+        token.current_department_id = Some(dept_id);
+        let new_token_id = uuid();
+        token.token_id = new_token_id;
+        save_token_with_exp_days(&token, get_token_expiration_days()?)?;
+        jwt_encode_token(token).map_err(|e| anyhow!(e))
     })();
     match result {
         Ok(ok) => wrap_json_ok_resp(ok),
