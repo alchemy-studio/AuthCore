@@ -7336,6 +7336,13 @@ pub fn uc_rocket(db_url: &str) -> Router {
         .route("/api/v1/uc/org/homepage/{org_id}", get(ws_org::get_org_homepage))
         .route("/api/v1/uc/org/departments/my", get(ws_org::my_departments))
         .route("/api/v1/uc/org/department/switch", post(ws_org::switch_department))
+        .route("/api/v1/uc/org/department/create", post(ws_org::create_department))
+        .route("/api/v1/uc/org/department/update", post(ws_org::update_department))
+        .route("/api/v1/uc/org/department/delete", post(ws_org::delete_department))
+        .route("/api/v1/uc/org/departments/list_by_org", get(ws_org::list_departments_by_org))
+        .route("/api/v1/uc/org/department/add_member", post(ws_org::add_department_member))
+        .route("/api/v1/uc/org/department/remove_member", post(ws_org::remove_department_member))
+        .route("/api/v1/uc/org/department/members/{dept_id}", get(ws_org::list_department_members))
         .layer(TraceLayer::new_for_http())
         .with_state(shared_db_state);
 

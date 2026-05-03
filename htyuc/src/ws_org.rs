@@ -10,7 +10,7 @@ use htycommons::web::{
     HtyHostHeader, ReqOrgMember, ReqOrgRole, ReqOrganization, ReqOrgSwitch,
 };
 use htycommons::uuid;
-use htyuc_models::models::{Department, DepartmentMember, HtyApp, HtyRole, OrgMember, OrgRole, Organization, UserAppInfo};
+use htyuc_models::models::{Department, DepartmentMember, HtyApp, HtyRole, OrgMember, OrgRole, Organization, ReqDepartment, ReqDepartmentMember, UserAppInfo};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::collections::HashSet;
@@ -564,6 +564,209 @@ pub async fn switch_department(
         jwt_encode_token(token).map_err(|e| anyhow!(e))
     })();
     match result {
+        Ok(ok) => wrap_json_ok_resp(ok),
+        Err(e) => wrap_json_anyhow_err(e),
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Department CRUD APIs (admin)
+// ---------------------------------------------------------------------------
+
+/// POST /api/v1/uc/org/department/create
+pub async fn create_department(
+    _sudoer: HtySudoerTokenHeader,
+    State(db_pool): State<Arc<DbState>>,
+    Json(body): Json<ReqDepartment>,
+) -> Json<HtyResponse<Department>> {
+    let result = (|| -> anyhow::Result<Department> {
+        let mut conn_holder = extract_conn(fetch_db_conn(&db_pool)?);
+        let conn = conn_holder.deref_mut();
+        let now = current_local_datetime();
+        let org_id = body.org_id.ok_or_else(|| anyhow!("org_id is required"))?;
+        Organization::find_by_id(&org_id, conn)?;
+        let new_dept = Department {
+            id: body.id.unwrap_or_else(uuid),
+            org_id,
+            dept_name: body.dept_name.ok_or_else(|| anyhow!("dept_name is required"))?,
+            dept_desc: body.dept_desc,
+            supervisor_user_info_id: body.supervisor_user_info_id,
+            is_default: body.is_default.unwrap_or(false),
+            dept_status: body.dept_status.unwrap_or_else(|| "ACTIVE".to_string()),
+            created_at: now,
+            created_by: body.created_by,
+            updated_at: None,
+            updated_by: None,
+            is_delete: false,
+        };
+        Department::create(&new_dept, conn)
+    })();
+    match result {
+        Ok(ok) => wrap_json_ok_resp(ok),
+        Err(e) => wrap_json_anyhow_err(e),
+    }
+}
+
+/// POST /api/v1/uc/org/department/update
+pub async fn update_department(
+    _sudoer: HtySudoerTokenHeader,
+    State(db_pool): State<Arc<DbState>>,
+    Json(body): Json<ReqDepartment>,
+) -> Json<HtyResponse<Department>> {
+    let result = (|| -> anyhow::Result<Department> {
+        let mut conn_holder = extract_conn(fetch_db_conn(&db_pool)?);
+        let conn = conn_holder.deref_mut();
+        let dept_id = body.id.ok_or_else(|| anyhow!("id is required"))?;
+        let mut dept = Department::find_by_id(&dept_id, conn)?;
+        if let Some(v) = body.dept_name {
+            dept.dept_name = v;
+        }
+        if body.dept_desc.is_some() {
+            dept.dept_desc = body.dept_desc;
+        }
+        if body.supervisor_user_info_id.is_some() {
+            dept.supervisor_user_info_id = body.supervisor_user_info_id;
+        }
+        if let Some(v) = body.is_default {
+            dept.is_default = v;
+        }
+        if let Some(v) = body.dept_status {
+            dept.dept_status = v;
+        }
+        dept.updated_at = Some(current_local_datetime());
+        dept.updated_by = body.updated_by;
+        Department::update(&dept, conn)
+    })();
+    match result {
+        Ok(ok) => wrap_json_ok_resp(ok),
+        Err(e) => wrap_json_anyhow_err(e),
+    }
+}
+
+/// POST /api/v1/uc/org/department/delete
+pub async fn delete_department(
+    _sudoer: HtySudoerTokenHeader,
+    auth: AuthorizationHeader,
+    State(db_pool): State<Arc<DbState>>,
+    Json(body): Json<ReqDepartment>,
+) -> Json<HtyResponse<Department>> {
+    let result = (|| -> anyhow::Result<Department> {
+        let dept_id = body.id.ok_or_else(|| anyhow!("id is required"))?;
+        let mut conn_holder = extract_conn(fetch_db_conn(&db_pool)?);
+        let conn = conn_holder.deref_mut();
+        let active_members = DepartmentMember::find_by_department_id(&dept_id, conn)?;
+        if !active_members.is_empty() {
+            return Err(anyhow!(HtyErr {
+                code: HtyErrCode::WebErr,
+                reason: Some("department has active members and cannot be deleted".to_string()),
+            }));
+        }
+        let token = jwt_decode_token(&(*auth).clone())?;
+        Department::soft_delete_by_id(&dept_id, &token.hty_id, conn)
+    })();
+    match result {
+        Ok(ok) => wrap_json_ok_resp(ok),
+        Err(e) => wrap_json_anyhow_err(e),
+    }
+}
+
+/// GET /api/v1/uc/org/departments/list_by_org?org_id=
+pub async fn list_departments_by_org(
+    _sudoer: HtySudoerTokenHeader,
+    State(db_pool): State<Arc<DbState>>,
+    Query(params): Query<HashMap<String, String>>,
+) -> Json<HtyResponse<Vec<Department>>> {
+    let result = (|| -> anyhow::Result<Vec<Department>> {
+        let org_id = get_some_from_query_params::<String>("org_id", &params)
+            .ok_or_else(|| anyhow!("org_id is required"))?;
+        Department::find_all_by_org_id(
+            &org_id,
+            extract_conn(fetch_db_conn(&db_pool)?).deref_mut(),
+        )
+    })();
+    match result {
+        Ok(ok) => wrap_json_ok_resp(ok),
+        Err(e) => wrap_json_anyhow_err(e),
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Department Member APIs (admin)
+// ---------------------------------------------------------------------------
+
+/// POST /api/v1/uc/org/department/add_member
+pub async fn add_department_member(
+    _sudoer: HtySudoerTokenHeader,
+    State(db_pool): State<Arc<DbState>>,
+    Json(body): Json<ReqDepartmentMember>,
+) -> Json<HtyResponse<DepartmentMember>> {
+    let result = (|| -> anyhow::Result<DepartmentMember> {
+        let dept_id = body.department_id.ok_or_else(|| anyhow!("department_id is required"))?;
+        let user_info_id = body.user_info_id.ok_or_else(|| anyhow!("user_info_id is required"))?;
+        let mut conn_holder = extract_conn(fetch_db_conn(&db_pool)?);
+        let conn = conn_holder.deref_mut();
+
+        let dept = Department::find_by_id(&dept_id, conn)?;
+        let existing = DepartmentMember::find_by_department_id_and_user_info_id(&dept_id, &user_info_id, conn)?;
+        if existing.is_some() {
+            return Err(anyhow!(HtyErr {
+                code: HtyErrCode::WebErr,
+                reason: Some("user is already a member of this department".to_string()),
+            }));
+        }
+
+        let now = current_local_datetime();
+        let member = DepartmentMember {
+            id: body.id.unwrap_or_else(uuid),
+            department_id: dept_id,
+            org_id: body.org_id.unwrap_or(dept.org_id),
+            user_info_id,
+            member_status: body.member_status.unwrap_or_else(|| "ACTIVE".to_string()),
+            joined_at: now,
+            created_at: now,
+            created_by: body.created_by,
+            updated_at: None,
+            updated_by: None,
+        };
+        DepartmentMember::create(&member, conn)
+    })();
+    match result {
+        Ok(ok) => wrap_json_ok_resp(ok),
+        Err(e) => wrap_json_anyhow_err(e),
+    }
+}
+
+/// POST /api/v1/uc/org/department/remove_member
+pub async fn remove_department_member(
+    _sudoer: HtySudoerTokenHeader,
+    State(db_pool): State<Arc<DbState>>,
+    Json(body): Json<ReqDepartmentMember>,
+) -> Json<HtyResponse<usize>> {
+    let result = (|| -> anyhow::Result<usize> {
+        let dept_id = body.department_id.ok_or_else(|| anyhow!("department_id is required"))?;
+        let user_info_id = body.user_info_id.ok_or_else(|| anyhow!("user_info_id is required"))?;
+        DepartmentMember::delete_by_department_id_and_user_info_id(
+            &dept_id,
+            &user_info_id,
+            extract_conn(fetch_db_conn(&db_pool)?).deref_mut(),
+        )
+    })();
+    match result {
+        Ok(ok) => wrap_json_ok_resp(ok),
+        Err(e) => wrap_json_anyhow_err(e),
+    }
+}
+
+/// GET /api/v1/uc/org/department/members/{dept_id}
+pub async fn list_department_members(
+    _sudoer: HtySudoerTokenHeader,
+    State(db_pool): State<Arc<DbState>>,
+    Path(dept_id): Path<String>,
+) -> Json<HtyResponse<Vec<DepartmentMember>>> {
+    match DepartmentMember::find_by_department_id(
+        &dept_id,
+        extract_conn(fetch_db_conn(&db_pool).unwrap()).deref_mut(),
+    ) {
         Ok(ok) => wrap_json_ok_resp(ok),
         Err(e) => wrap_json_anyhow_err(e),
     }
