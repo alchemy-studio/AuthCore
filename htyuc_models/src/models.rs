@@ -1347,6 +1347,21 @@ impl UserAppInfo {
         }
     }
 
+    pub fn find_all_by_hty_id(
+        hty_id: &String,
+        conn: &mut PgConnection,
+    ) -> anyhow::Result<Vec<UserAppInfo>> {
+        user_app_info::table
+            .filter(user_app_info::hty_id.eq(hty_id))
+            .load::<UserAppInfo>(conn)
+            .map_err(|e| {
+                anyhow!(HtyErr {
+                    code: HtyErrCode::DbErr,
+                    reason: Some(e.to_string()),
+                })
+            })
+    }
+
     pub fn find_opt_by_hty_id_and_app_id(
         in_hty_id: &str,
         in_app_id: &str,

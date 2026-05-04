@@ -32,6 +32,17 @@ fn current_user_app_info_id(
     Ok(UserAppInfo::find_by_hty_id_and_app_id(&user_hty_id, &user_app_id, conn)?.id)
 }
 
+fn all_user_app_info_ids(
+    auth: &AuthorizationHeader,
+    host: &HtyHostHeader,
+    conn: &mut diesel::PgConnection,
+) -> anyhow::Result<Vec<String>> {
+    let token = jwt_decode_token(&(*auth).clone())?;
+    let user_hty_id = token.hty_id.ok_or_else(|| anyhow!("hty_id is required in token"))?;
+    let infos = UserAppInfo::find_all_by_hty_id(&user_hty_id, conn)?;
+    Ok(infos.into_iter().map(|info| info.id).collect())
+}
+
 fn apply_org_context_to_token(
     token: &mut htycommons::web::HtyToken,
     target_org_id: String,
@@ -347,14 +358,16 @@ pub async fn my_orgs(
     let result = (|| -> anyhow::Result<Vec<Organization>> {
         let mut conn_holder = extract_conn(fetch_db_conn(&db_pool)?);
         let conn = conn_holder.deref_mut();
-        let user_info_id = current_user_app_info_id(&auth, &host, conn)?;
-        let members = OrgMember::find_by_user_info_id(&user_info_id, conn)?;
+        let user_info_ids = all_user_app_info_ids(&auth, &host, conn)?;
         let mut organizations_result = Vec::new();
         let mut seen_org_ids = HashSet::new();
-        for member in members {
-            let org = Organization::find_by_id(&member.org_id, conn)?;
-            if !org.is_delete && seen_org_ids.insert(org.id.clone()) {
-                organizations_result.push(org);
+        for user_info_id in user_info_ids {
+            let members = OrgMember::find_by_user_info_id(&user_info_id, conn)?;
+            for member in members {
+                let org = Organization::find_by_id(&member.org_id, conn)?;
+                if !org.is_delete && seen_org_ids.insert(org.id.clone()) {
+                    organizations_result.push(org);
+                }
             }
         }
         Ok(organizations_result)
