@@ -4020,7 +4020,7 @@ Serialize,
 #[diesel(belongs_to(HtyTemplate, foreign_key = template_id))]
 #[diesel(belongs_to(HtyApp, foreign_key = app_id))]
 #[diesel(table_name = hty_template_data)]
-pub struct HtyTemplateData<T: Debug + Serialize + DeserializeOwned + Clone> {
+pub struct HtyTemplateData<T: Debug + Serialize + DeserializeOwned + Clone + 'static> {
     pub id: String,
     pub app_id: String,
     pub template_id: String,
