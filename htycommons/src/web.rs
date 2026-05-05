@@ -120,26 +120,19 @@ where
     async fn from_request_parts(req: &mut Parts, _state: &B) -> Result<Self, Self::Rejection> {
         let headers = req.headers.clone();
 
-        let token_result = headers["Authorization"].to_str();
+        let token_str = match headers.get("Authorization").and_then(|v| v.to_str().ok()) {
+            Some(s) => s,
+            None => {
+                let resp = wrap_auth_err(&None);
+                return Err((StatusCode::UNAUTHORIZED, resp));
+            }
+        };
 
-        if token_result.is_err() {
-            let resp = wrap_auth_err(&None);
-            Err((StatusCode::UNAUTHORIZED, resp))
-        } else {
-            match token_result {
-                Ok(token_str) => {
-                    match jwt_decode_token(&token_str.to_string()) {
-                        Ok(resp) => Ok(resp),
-                        Err(err) => {
-                            let resp = wrap_auth_err(&Some(err.to_string()));
-                            Err((StatusCode::UNAUTHORIZED, resp))
-                        }
-                    }
-                }
-                Err(_) => {
-                    let resp = wrap_auth_err(&None);
-                    Err((StatusCode::UNAUTHORIZED, resp))
-                }
+        match jwt_decode_token(&token_str.to_string()) {
+            Ok(resp) => Ok(resp),
+            Err(err) => {
+                let resp = wrap_auth_err(&Some(err.to_string()));
+                Err((StatusCode::UNAUTHORIZED, resp))
             }
         }
     }
