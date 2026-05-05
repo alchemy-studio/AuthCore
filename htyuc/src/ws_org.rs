@@ -390,6 +390,11 @@ pub async fn switch_org(
         let mut conn_holder = extract_conn(fetch_db_conn(&db_pool)?);
         let conn = conn_holder.deref_mut();
         let user_info_id = current_user_app_info_id(&auth, &host, conn)?;
+        // Fill missing app_id so the refreshed token is self-sufficient
+        if token.app_id.is_none() {
+            let in_app = HtyApp::find_by_domain(&host.to_string(), conn)?;
+            token.app_id = Some(in_app.app_id);
+        }
         let mut org_roles = OrgMember::find_roles_by_user_info_id_and_org_id(&user_info_id, &target_org_id, conn)?;
         let system_roles = OrgMember::find_system_roles_by_user_info_id(&user_info_id, conn)?;
         if org_roles.is_empty() {
@@ -541,6 +546,7 @@ pub async fn my_departments(
 /// POST /api/v1/uc/org/department/switch
 pub async fn switch_department(
     auth: AuthorizationHeader,
+    host: HtyHostHeader,
     State(db_pool): State<Arc<DbState>>,
     Json(req): Json<ReqDeptSwitch>,
 ) -> Json<HtyResponse<String>> {
@@ -560,8 +566,11 @@ pub async fn switch_department(
         }
 
         let user_hty_id = token.hty_id.as_ref().ok_or_else(|| anyhow!("hty_id required in token"))?;
-        let user_app_id = token.app_id.as_ref().ok_or_else(|| anyhow!("app_id required in token"))?;
-        let user_info = UserAppInfo::find_by_hty_id_and_app_id(user_hty_id, user_app_id, conn)?;
+        let user_app_id = match token.app_id {
+            Some(ref app_id) => app_id.clone(),
+            None => HtyApp::find_by_domain(&host.to_string(), conn)?.app_id,
+        };
+        let user_info = UserAppInfo::find_by_hty_id_and_app_id(user_hty_id, &user_app_id, conn)?;
         let membership = DepartmentMember::find_by_department_id_and_user_info_id(&dept_id, &user_info.id, conn)?;
         if membership.is_none() {
             return Err(anyhow!(HtyErr {
