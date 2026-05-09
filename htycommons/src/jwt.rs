@@ -47,7 +47,8 @@ pub fn jwt_encode_token(token: HtyToken) -> Result<String, HtyErr> {
 }
 
 pub fn jwt_decode_token(raw_token: &String) -> Result<HtyToken, HtyErr> {
-    let token = raw_token.clone().replacen("\\\"", "", 2);
+    let token_str = if raw_token.starts_with("Bearer ") { &raw_token[7..] } else { raw_token.as_str() };
+    let token = token_str.to_string().replacen("\"", "", 2);
     //debug(format!("decode token -> {:?}", token).as_str());
     debug!("jwt_decode_token -> token to decode: {:?}", token);
 
