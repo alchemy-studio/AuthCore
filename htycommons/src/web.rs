@@ -97,14 +97,9 @@ where
 
     async fn from_request_parts(req: &mut Parts, _state: &B) -> Result<Self, Self::Rejection> {
         let headers = &req.headers;
-        if headers.contains_key("Authorization") {
-            Ok(Self(
-                headers["Authorization"]
-                    .to_str()
-                    .map_err(internal_error)?
-                    .to_string(),
-            ))
-        } else {
+        match headers.get("Authorization").and_then(|v| v.to_str().ok()) {
+            Some(s) => Ok(Self(s.to_string())),
+            None => {
             let resp = wrap_auth_err(&None);
             Err((StatusCode::UNAUTHORIZED, resp))
         }
