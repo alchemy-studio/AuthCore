@@ -9,6 +9,7 @@ use diesel::pg::{Pg, PgValue};
 // use diesel::serialize::IsNull;
 use diesel::sql_types::Jsonb;
 use diesel::{insert_into, select, sql_query, update, BelongingToDsl, BoolExpressionMethods, Connection, EqAll, ExpressionMethods, PgConnection, QueryDsl, RunQueryDsl, TextExpressionMethods, OptionalExtension};
+use diesel::dsl::sql;
 use htycommons::cert::encrypt_text_with_private_key;
 use std::io::Write;
 // use htycommons::pagination::LoadPaginated;
@@ -128,11 +129,16 @@ impl HtyUser {
         let mut q = hty_users::table.into_boxed();
         q = q.order(created_at.desc());
 
-        if let Some(keyword_copy) = keyword.clone() {
+        if let Some(ref keyword_copy) = keyword {
+            let kw = keyword_copy.clone();
+            let name_pat = format!("%{}%", &kw);
+            let nick_pat = format!("%{}%", &kw.replace("'", "''"));
+            let nick_sql = format!("EXISTS (SELECT 1 FROM user_app_info WHERE user_app_info.hty_id = hty_users.hty_id AND user_app_info.meta->>'\''nickName'\'' ILIKE '\''{}'\'')", nick_pat);
             q = q.filter(
                 real_name
-                    .ilike(format!("%{}%", keyword_copy.clone()))
-                    .or(mobile.like(format!("%{}%", keyword_copy.clone()))),
+                    .ilike(name_pat.clone())
+                    .or(mobile.like(name_pat))
+                    .or(sql::<diesel::sql_types::Bool>(&nick_sql)),
             );
         }
 
