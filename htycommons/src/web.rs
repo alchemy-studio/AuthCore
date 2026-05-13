@@ -100,8 +100,9 @@ where
         match headers.get("Authorization").and_then(|v| v.to_str().ok()) {
             Some(s) => Ok(Self(s.to_string())),
             None => {
-            let resp = wrap_auth_err(&None);
-            Err((StatusCode::UNAUTHORIZED, resp))
+                let resp = wrap_auth_err(&None);
+                Err((StatusCode::UNAUTHORIZED, resp))
+            }
         }
     }
 }
