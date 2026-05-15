@@ -46,7 +46,8 @@ pub async fn batch_generate(
     let count = req.count.unwrap_or(10).max(1).min(100);
     let teacher_hty_id = token.hty_id.ok_or(StatusCode::BAD_REQUEST)?;
     let pool = fetch_db_conn(&db_pool).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-    let conn = &mut *extract_conn(pool).deref_mut();
+    let mut guard = extract_conn(pool);
+    let conn = &mut *guard;
     let now = current_local_datetime().format("%Y-%m-%d %H:%M:%S").to_string();
 
     let mut codes = Vec::new();
@@ -77,7 +78,8 @@ pub async fn consume(
     Json(req): Json<ConsumeReq>,
 ) -> Result<Json<HtyResponse<serde_json::Value>>, StatusCode> {
     let pool = fetch_db_conn(&db_pool).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-    let conn = &mut *extract_conn(pool).deref_mut();
+    let mut guard = extract_conn(pool);
+    let conn = &mut *guard;
 
     let safe_code = req.code.replace('\'', "''");
     let sql = format!(
@@ -123,7 +125,8 @@ pub async fn list(
 ) -> Result<Json<HtyResponse<Vec<serde_json::Value>>>, StatusCode> {
     let teacher_hty_id = token.hty_id.ok_or(StatusCode::BAD_REQUEST)?;
     let pool = fetch_db_conn(&db_pool).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-    let conn = &mut *extract_conn(pool).deref_mut();
+    let mut guard = extract_conn(pool);
+    let conn = &mut *guard;
 
     let sql = format!(
         "SELECT code, teacher_id, org_id, status, created_at::text, consumed_at::text FROM invitation_codes WHERE teacher_id = '{}' ORDER BY created_at DESC",
