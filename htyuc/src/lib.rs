@@ -38,6 +38,7 @@ use htycommons::models::*;
 pub mod ddl;
 pub mod r_uc;
 pub mod ws_org;
+pub mod invite_code;
 mod notifications;
 
 
@@ -7343,6 +7344,10 @@ pub fn uc_rocket(db_url: &str) -> Router {
         .route("/api/v1/uc/org/department/add_member", post(ws_org::add_department_member))
         .route("/api/v1/uc/org/department/remove_member", post(ws_org::remove_department_member))
         .route("/api/v1/uc/org/department/members/{dept_id}", get(ws_org::list_department_members))
+        // invitation codes
+        .route("/api/v1/uc/invite_code/batch", post(invite_code::batch_generate))
+        .route("/api/v1/uc/invite_code/consume", post(invite_code::consume))
+        .route("/api/v1/uc/invite_code/list", get(invite_code::list))
         .layer(TraceLayer::new_for_http())
         .with_state(shared_db_state);
 
