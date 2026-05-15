@@ -3,8 +3,8 @@ use htycommons::common::{current_local_datetime, HtyResponse, HtyErr, HtyErrCode
 use htycommons::db::{extract_conn, fetch_db_conn, DbState};
 use htycommons::web::{HtyToken, HtySudoerTokenHeader, wrap_json_ok_resp};
 use diesel::{sql_query, RunQueryDsl, QueryableByName};
-use serde::{Deserialize, Serialize};
 use std::ops::DerefMut;
+use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tracing::error;
 
@@ -37,25 +37,16 @@ pub struct ConsumeReq {
     pub code: String,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
-pub struct InviteCodeInfo {
-    pub code: String,
-    pub teacher_id: String,
-    pub org_id: Option<String>,
-    pub status: String,
-    pub created_at: String,
-    pub consumed_at: Option<String>,
-}
-
 /// POST /api/v1/uc/invite_code/batch
 pub async fn batch_generate(
     State(db_pool): State<Arc<DbState>>,
     token: HtyToken,
     Json(req): Json<BatchGenerateReq>,
-) -> Result<(StatusCode, Json<HtyResponse<Vec<String>>>), StatusCode> {
+) -> Result<Json<HtyResponse<Vec<String>>>, StatusCode> {
     let count = req.count.unwrap_or(10).max(1).min(100);
     let teacher_hty_id = token.hty_id.ok_or(StatusCode::BAD_REQUEST)?;
-    let conn = &mut *extract_conn(fetch_db_conn(&db_pool).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?).deref_mut();
+    let pool = fetch_db_conn(&db_pool).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let conn = &mut *extract_conn(pool).deref_mut();
     let now = current_local_datetime().format("%Y-%m-%d %H:%M:%S").to_string();
 
     let mut codes = Vec::new();
@@ -76,7 +67,7 @@ pub async fn batch_generate(
         })?;
         codes.push(code_str);
     }
-    Ok((StatusCode::OK, wrap_json_ok_resp(codes)))
+    Ok(wrap_json_ok_resp(codes))
 }
 
 /// POST /api/v1/uc/invite_code/consume
@@ -85,7 +76,8 @@ pub async fn consume(
     _sudoer: HtySudoerTokenHeader,
     Json(req): Json<ConsumeReq>,
 ) -> Result<Json<HtyResponse<serde_json::Value>>, StatusCode> {
-    let conn = &mut *extract_conn(fetch_db_conn(&db_pool).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?).deref_mut();
+    let pool = fetch_db_conn(&db_pool).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let conn = &mut *extract_conn(pool).deref_mut();
 
     let safe_code = req.code.replace('\'', "''");
     let sql = format!(
@@ -109,18 +101,17 @@ pub async fn consume(
                 "created_at": row.created_at,
                 "consumed_at": row.consumed_at,
             });
-            Ok(Json(wrap_json_ok_resp(info)))
+            Ok(wrap_json_ok_resp(info))
         }
         None => {
-            let err = HtyResponse::<()> {
+            Ok(Json(HtyResponse {
                 r: false, d: None,
                 e: Some("invalid or used invite code".to_string()),
                 hty_err: Some(HtyErr {
                     code: HtyErrCode::WebErr,
                     reason: Some("invite code not found or already used".to_string()),
                 }),
-            };
-            Ok(Json(err))
+            }))
         }
     }
 }
@@ -131,7 +122,8 @@ pub async fn list(
     token: HtyToken,
 ) -> Result<Json<HtyResponse<Vec<serde_json::Value>>>, StatusCode> {
     let teacher_hty_id = token.hty_id.ok_or(StatusCode::BAD_REQUEST)?;
-    let conn = &mut *extract_conn(fetch_db_conn(&db_pool).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?).deref_mut();
+    let pool = fetch_db_conn(&db_pool).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let conn = &mut *extract_conn(pool).deref_mut();
 
     let sql = format!(
         "SELECT code, teacher_id, org_id, status, created_at::text, consumed_at::text FROM invitation_codes WHERE teacher_id = '{}' ORDER BY created_at DESC",
@@ -155,7 +147,7 @@ pub async fn list(
         })
     }).collect();
 
-    Ok(Json(wrap_json_ok_resp(items)))
+    Ok(wrap_json_ok_resp(items))
 }
 
 #[derive(QueryableByName, Debug)]
