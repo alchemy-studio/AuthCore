@@ -43,13 +43,35 @@ pub async fn batch_generate(
     token: HtyToken,
     Json(req): Json<BatchGenerateReq>,
 ) -> Result<Json<HtyResponse<Vec<String>>>, StatusCode> {
-    let count = req.count.unwrap_or(10).max(1).min(100);
+    let max_active: i64 = 100;
+    let requested = req.count.unwrap_or(10).max(1).min(100);
     let teacher_hty_id = token.hty_id.ok_or(StatusCode::BAD_REQUEST)?;
     let pool = fetch_db_conn(&db_pool).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     let mut guard = extract_conn(pool);
     let conn = &mut *guard;
-    let now = current_local_datetime().format("%Y-%m-%d %H:%M:%S").to_string();
 
+    // Count current active codes for this teacher
+    let count_sql = format!(
+        "SELECT COUNT(*)::bigint AS cnt FROM invitation_codes WHERE teacher_id = '{}' AND status = 'active'",
+        teacher_hty_id,
+    );
+    let active_count: i64 = sql_query(&count_sql)
+        .load::<ActiveCountRow>(conn)
+        .map_err(|e| {
+            error!("[invite_code batch] count error: {e}");
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?
+        .first()
+        .map(|r| r.cnt)
+        .unwrap_or(0);
+
+    let remaining = max_active - active_count;
+    if remaining <= 0 {
+        return Ok(wrap_json_ok_resp(Vec::<String>::new()));
+    }
+    let count = requested.min(remaining as i32);
+
+    let now = current_local_datetime().format("%Y-%m-%d %H:%M:%S").to_string();
     let mut codes = Vec::new();
     for _ in 0..count {
         let code_str = generate_code();
@@ -160,6 +182,12 @@ pub async fn list(
     }).collect();
 
     Ok(wrap_json_ok_resp(items))
+}
+
+#[derive(QueryableByName, Debug)]
+struct ActiveCountRow {
+    #[diesel(sql_type = diesel::sql_types::BigInt)]
+    cnt: i64,
 }
 
 #[derive(QueryableByName, Debug)]
