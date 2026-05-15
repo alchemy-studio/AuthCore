@@ -95,13 +95,22 @@ pub async fn consume(
 
     match rows.first() {
         Some(row) => {
+            let now = current_local_datetime().format("%Y-%m-%d %H:%M:%S").to_string();
+            let update_sql = format!(
+                "UPDATE invitation_codes SET status = 'consumed', consumed_at = '{}' WHERE code = '{}'",
+                now, safe_code,
+            );
+            sql_query(&update_sql).execute(conn).map_err(|e| {
+                error!("[invite_code consume] update error: {e}");
+                StatusCode::INTERNAL_SERVER_ERROR
+            })?;
             let info = serde_json::json!({
                 "code": row.code,
                 "teacher_id": row.teacher_id,
                 "org_id": row.org_id,
-                "status": row.status,
+                "status": "consumed",
                 "created_at": row.created_at,
-                "consumed_at": row.consumed_at,
+                "consumed_at": now,
             });
             Ok(wrap_json_ok_resp(info))
         }
