@@ -1822,6 +1822,10 @@ async fn raw_register(
             }
             "STUDENT" => {
                 to_create_user_from_app_info.student_info = register_info.student_info.clone();
+                // Auto-approve student registration (is_registered = true) when enabled
+                if register_info.enabled.unwrap_or(false) {
+                    to_create_user_from_app_info.is_registered = true;
+                }
                 let role = HtyRole::find_by_key(
                     "STUDENT",
                     extract_conn(fetch_db_conn(&db_pool)?).deref_mut(),
