@@ -1819,28 +1819,15 @@ async fn raw_register(
         )?;
         to_create_from_user_info_role.role_id = role.hty_role_id;
     } else if let Some(ref role_key) = register_info.role {
-        match role_key.as_str() {
-            "TEACHER" => {
-                let role = HtyRole::find_by_key(
-                    "TEACHER",
-                    extract_conn(fetch_db_conn(&db_pool)?).deref_mut(),
-                )?;
-                to_create_from_user_info_role.role_id = role.hty_role_id;
-            }
-            "STUDENT" => {
-                let role = HtyRole::find_by_key(
-                    "STUDENT",
-                    extract_conn(fetch_db_conn(&db_pool)?).deref_mut(),
-                )?;
-                to_create_from_user_info_role.role_id = role.hty_role_id;
-            }
-            _ => {
-                return Err(anyhow!(HtyErr {
-                    code: HtyErrCode::WebErr,
-                    reason: Some("Role must be teacher or student".into()),
-                }));
-            }
-        }
+        let role = HtyRole::find_by_key(
+            role_key,
+            extract_conn(fetch_db_conn(&db_pool)?).deref_mut(),
+        )
+        .map_err(|_| anyhow!(HtyErr {
+            code: HtyErrCode::WebErr,
+            reason: Some(format!("unknown role_key: {role_key}")),
+        }))?;
+        to_create_from_user_info_role.role_id = role.hty_role_id;
     } else {
         return Err(anyhow!(HtyErr {
             code: HtyErrCode::WebErr,
