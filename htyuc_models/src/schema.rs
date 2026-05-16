@@ -234,6 +234,20 @@ diesel::table! {
 }
 
 diesel::table! {
+    invitation_codes (id) {
+        id -> Varchar,
+        code -> Varchar,
+        teacher_id -> Varchar,
+        org_id -> Nullable<Varchar>,
+        student_user_info_id -> Nullable<Varchar>,
+        status -> Varchar,
+        created_at -> Timestamp,
+        consumed_at -> Nullable<Timestamp>,
+        expires_at -> Nullable<Timestamp>,
+    }
+}
+
+diesel::table! {
     org_members (id) {
         id -> Varchar,
         org_id -> Varchar,
@@ -402,6 +416,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     hty_user_rels,
     hty_users,
     hty_visitors,
+    invitation_codes,
     org_members,
     org_roles,
     organizations,
