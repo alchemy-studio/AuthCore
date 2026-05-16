@@ -880,6 +880,7 @@ pub struct ReqRegister {
     pub sex: Option<i32>,
     pub mobile: Option<String>,
     pub role: Option<String>,
+    pub role_id: Option<String>,
     pub teacher_id: Option<String>,
     pub meta: Option<MetaUserAppInfo>,
     pub teacher_info: Option<TeacherInfo>,
@@ -2185,6 +2186,20 @@ impl HtyRole {
         use crate::schema::hty_roles::dsl::*;
         match hty_roles
             .filter(role_key.eq(name.to_string()))
+            .get_result::<HtyRole>(conn)
+        {
+            Ok(role) => Ok(role),
+            Err(e) => Err(anyhow!(HtyErr {
+                code: HtyErrCode::DbErr,
+                reason: Some(e.to_string()),
+            })),
+        }
+    }
+
+    pub fn find_by_hty_role_id(role_id: &str, conn: &mut PgConnection) -> anyhow::Result<HtyRole> {
+        use crate::schema::hty_roles::dsl::*;
+        match hty_roles
+            .filter(hty_role_id.eq(role_id.to_string()))
             .get_result::<HtyRole>(conn)
         {
             Ok(role) => Ok(role),

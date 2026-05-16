@@ -1810,10 +1810,17 @@ async fn raw_register(
         role_id: "".to_string(),
     };
 
-    match register_info.clone().role {
-        Some(role) => match role.as_str() {
+    // role_id takes precedence over role (business-agnostic: AuthCore doesn't need
+    // to know about STUDENT/TEACHER semantics)
+    if let Some(ref role_id) = register_info.role_id {
+        let role = HtyRole::find_by_hty_role_id(
+            role_id,
+            extract_conn(fetch_db_conn(&db_pool)?).deref_mut(),
+        )?;
+        to_create_from_user_info_role.role_id = role.hty_role_id;
+    } else if let Some(ref role_key) = register_info.role {
+        match role_key.as_str() {
             "TEACHER" => {
-                to_create_user_from_app_info.teacher_info = register_info.teacher_info.clone();
                 let role = HtyRole::find_by_key(
                     "TEACHER",
                     extract_conn(fetch_db_conn(&db_pool)?).deref_mut(),
@@ -1821,7 +1828,6 @@ async fn raw_register(
                 to_create_from_user_info_role.role_id = role.hty_role_id;
             }
             "STUDENT" => {
-                to_create_user_from_app_info.student_info = register_info.student_info.clone();
                 let role = HtyRole::find_by_key(
                     "STUDENT",
                     extract_conn(fetch_db_conn(&db_pool)?).deref_mut(),
@@ -1834,14 +1840,17 @@ async fn raw_register(
                     reason: Some("Role must be teacher or student".into()),
                 }));
             }
-        },
-        _ => {
-            return Err(anyhow!(HtyErr {
-                code: HtyErrCode::WebErr,
-                reason: Some("invalid role".into()),
-            }));
         }
+    } else {
+        return Err(anyhow!(HtyErr {
+            code: HtyErrCode::WebErr,
+            reason: Some("role or role_id required".into()),
+        }));
     }
+
+    // Set teacher_info / student_info (always set; they will be None if absent)
+    to_create_user_from_app_info.teacher_info = register_info.teacher_info.clone();
+    to_create_user_from_app_info.student_info = register_info.student_info.clone();
 
     // ------from app user info created only once
     let _created_user = HtyUser::create(
