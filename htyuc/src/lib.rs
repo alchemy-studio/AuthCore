@@ -4829,11 +4829,12 @@ fn raw_delete_app_by_id(id: &String, db_pool: Arc<DbState>) -> anyhow::Result<Ht
 }
 
 pub async fn find_all_valid_teachers(
+    Query(params): Query<HashMap<String, String>>,
     host: HtyHostHeader,
     conn: db::DbConn,
 ) -> Json<HtyResponse<Vec<ReqHtyUserWithInfos>>> {
     debug!("find_all_valid_teachers -> starts");
-    let role = String::from("TEACHER");
+    let role = params.get("role").cloned().unwrap_or_else(|| String::from("TEACHER"));
     match raw_find_users_with_info_by_role(&role, host, extract_conn(conn).deref_mut()) {
         Ok(in_users) => {
             let mut resp = Vec::new();
