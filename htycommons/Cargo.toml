@@ -18,6 +18,7 @@ block-modes = { workspace = true }
 cbc = { workspace = true }
 chrono = { workspace = true }
 data-encoding = { workspace = true }
+generic-array = { workspace = true }
 diesel = { workspace = true }
 dotenv = { workspace = true }
 hex = { workspace = true }

@@ -88,7 +88,7 @@ pub async fn code2session(params: &WxParams) -> anyhow::Result<WxSession> {
 
 pub fn wx_decode(params: &WxParams, session_key: &str) -> anyhow::Result<String> {
     use aes::cipher::{
-        block_padding::Pkcs7, generic_array::GenericArray, BlockDecryptMut, KeyIvInit,
+        block_padding::Pkcs7, BlockModeDecrypt, KeyIvInit,
     };
     use cbc::Decryptor;
     type Aes128CbcDec = Decryptor<aes::Aes128>;
@@ -98,9 +98,6 @@ pub fn wx_decode(params: &WxParams, session_key: &str) -> anyhow::Result<String>
     let iv = params.iv.clone().ok_or_else(|| anyhow::anyhow!("iv is required"))?;
     let decoded_iv = BASE64_DECODER.decode(iv)
         .map_err(|e| anyhow::anyhow!("Failed to decode iv: {}", e))?;
-
-    let key = GenericArray::clone_from_slice(decoded_session_key.as_slice());
-    let iv = GenericArray::clone_from_slice(decoded_iv.as_slice());
 
     let encrypted_data = params.encrypted_data.clone().ok_or_else(|| anyhow::anyhow!("encrypted_data is required"))?;
     let decoded_encrypted_data = BASE64_DECODER.decode(encrypted_data)
@@ -112,8 +109,9 @@ pub fn wx_decode(params: &WxParams, session_key: &str) -> anyhow::Result<String>
     buf[..ct_len].copy_from_slice(&decoded_encrypted_data[..ct_len]);
     println!("Data buf : [{:?}]", buf);
 
-    let pt = Aes128CbcDec::new(&key, &iv)
-        .decrypt_padded_mut::<Pkcs7>(&mut buf)
+    let pt = Aes128CbcDec::new_from_slices(&decoded_session_key, &decoded_iv)
+        .map_err(|e| anyhow::anyhow!("Failed to init decryptor: {}", e))?
+        .decrypt_padded::<Pkcs7>(&mut buf)
         .map_err(|e| anyhow::anyhow!("Failed to decrypt data: {}", e))?;
 
     std::str::from_utf8(&pt)
