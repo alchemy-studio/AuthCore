@@ -575,6 +575,7 @@ pub struct ReqTeacherStudent {
     pub student_id: Option<String>,
     pub status: Option<String>,
     pub created_at: Option<NaiveDateTime>,
+    pub invite_code: Option<String>,
 }
 
 // #[derive(Serialize, Deserialize, Debug, Clone)]
