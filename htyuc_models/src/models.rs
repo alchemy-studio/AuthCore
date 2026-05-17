@@ -883,8 +883,8 @@ pub struct ReqRegister {
     pub role_id: Option<String>,
     pub teacher_id: Option<String>,
     pub meta: Option<MetaUserAppInfo>,
-    pub teacher_info: Option<TeacherInfo>,
-    pub student_info: Option<StudentInfo>,
+    pub extra_info: Option<ExtraInfo>,
+    pub extra_info2: Option<ExtraInfo2>,
     pub enabled: Option<bool>,
     pub user_settings: Option<MultiVals<UserSetting>>,
 }
@@ -1041,8 +1041,8 @@ pub struct UserAppInfo {
     pub password: Option<String>,
     pub meta: Option<MetaUserAppInfo>,
     pub created_at: Option<NaiveDateTime>,
-    pub teacher_info: Option<TeacherInfo>,
-    pub student_info: Option<StudentInfo>,
+    pub extra_info: Option<ExtraInfo>,
+    pub extra_info2: Option<ExtraInfo2>,
     pub reject_reason: Option<String>,
     pub needs_refresh: Option<bool>,
     pub avatar_url: Option<String>,
@@ -1056,20 +1056,20 @@ pub struct RespUserStatusByPhone {
 
 #[derive(AsExpression, FromSqlRow, Debug, Default, Serialize, Deserialize, PartialEq, Clone)]
 #[diesel(sql_type = Jsonb)]
-pub struct TeacherInfo {
+pub struct ExtraInfo {
     pub academic: Option<String>,
     pub experience: Option<String>,
 }
 
-impl_jsonb_boilerplate!(TeacherInfo);
+impl_jsonb_boilerplate!(ExtraInfo);
 
 #[derive(AsExpression, FromSqlRow, Debug, Default, Serialize, Deserialize, PartialEq, Clone)]
 #[diesel(sql_type = Jsonb)]
-pub struct StudentInfo {
+pub struct ExtraInfo2 {
     pub experience: Option<String>,
 }
 
-impl_jsonb_boilerplate!(StudentInfo);
+impl_jsonb_boilerplate!(ExtraInfo2);
 
 impl UserAppInfo {
     pub fn find_by_id(
@@ -1138,8 +1138,8 @@ impl UserAppInfo {
             roles: None,
             meta: self.meta.clone(),
             created_at: self.created_at.clone(),
-            teacher_info: self.teacher_info.clone(),
-            student_info: self.student_info.clone(),
+            extra_info: self.extra_info.clone(),
+            extra_info2: self.extra_info2.clone(),
             reject_reason: self.reject_reason.clone(),
             needs_refresh: self.needs_refresh.clone(),
             unread_tongzhi_count: None,
@@ -1613,8 +1613,8 @@ pub struct ReqUserAppInfo {
     pub roles: Option<Vec<ReqHtyRole>>,
     pub meta: Option<MetaUserAppInfo>,
     pub created_at: Option<NaiveDateTime>,
-    pub teacher_info: Option<TeacherInfo>,
-    pub student_info: Option<StudentInfo>,
+    pub extra_info: Option<ExtraInfo>,
+    pub extra_info2: Option<ExtraInfo2>,
     pub reject_reason: Option<String>,
     pub needs_refresh: Option<bool>,
     pub unread_tongzhi_count: Option<i32>,
@@ -1662,8 +1662,8 @@ impl ReqUserAppInfo {
             password: self.password.clone(),
             meta: self.meta.clone(),
             created_at: self.created_at.clone(),
-            teacher_info: self.teacher_info.clone(),
-            student_info: self.student_info.clone(),
+            extra_info: self.extra_info.clone(),
+            extra_info2: self.extra_info2.clone(),
             reject_reason: self.reject_reason.clone(),
             needs_refresh: self.needs_refresh.clone(),
             avatar_url: self.avatar_url.clone(),
