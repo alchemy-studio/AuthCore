@@ -4828,13 +4828,19 @@ fn raw_delete_app_by_id(id: &String, db_pool: Arc<DbState>) -> anyhow::Result<Ht
     Ok(res)
 }
 
-pub async fn find_all_valid_teachers(
+pub async fn find_users_by_role(
     Query(params): Query<HashMap<String, String>>,
     host: HtyHostHeader,
     conn: db::DbConn,
 ) -> Json<HtyResponse<Vec<ReqHtyUserWithInfos>>> {
-    debug!("find_all_valid_teachers -> starts");
-    let role = params.get("role").cloned().unwrap_or_else(|| String::from("TEACHER"));
+    let role = params.get("role").cloned().unwrap_or_default();
+    if role.is_empty() {
+        return wrap_json_hty_err(HtyErr {
+            code: HtyErrCode::CommonError,
+            reason: Some("role query parameter is required".to_string()),
+        });
+    }
+    debug!("find_users_by_role -> role: {}", role);
     match raw_find_users_with_info_by_role(&role, host, extract_conn(conn).deref_mut()) {
         Ok(in_users) => {
             let mut resp = Vec::new();
@@ -4852,15 +4858,15 @@ pub async fn find_all_valid_teachers(
                 }
             }
             debug!(
-                "find_all_valid_teachers -> success to find all valid teachers: {:?}!",
-                resp
+                "find_users_by_role -> success, role: {}, count: {:?}!",
+                role, resp.len()
             );
             wrap_json_ok_resp(resp)
         }
         Err(e) => {
             error!(
-                "find_all_valid_teachers -> failed to find all teachers. e: {}",
-                e
+                "find_users_by_role -> failed, role: {}, e: {}",
+                role, e
             );
             wrap_json_hty_err(HtyErr {
                 code: HtyErrCode::CommonError,
@@ -7116,8 +7122,8 @@ pub fn uc_rocket(db_url: &str) -> Router {
         )
         .route("/api/v1/uc/find_all_user_groups", get(find_all_user_groups))
         .route(
-            "/api/v1/uc/find_all_valid_teachers",
-            get(find_all_valid_teachers),
+            "/api/v1/uc/find_users_by_role",
+            get(find_users_by_role),
         )
         .route(
             "/api/v1/uc/find_users_by_app_id/{app_id}",
