@@ -568,26 +568,11 @@ pub struct ReqKV {
     pub exp_unit: Option<TimeUnit>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct ReqTeacherStudent {
-    pub id: Option<String>,
-    pub teacher_id: Option<String>,
-    pub student_id: Option<String>,
-    pub status: Option<String>,
-    pub created_at: Option<NaiveDateTime>,
-    pub invite_code: Option<String>,
-}
-
 // #[derive(Serialize, Deserialize, Debug, Clone)]
 // pub struct ReqDateFilter {
 //     pub start_date: Option<NaiveDateTime>,
 //     pub end_date: Option<NaiveDateTime>,
 // }
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct ReqTeacherStudentsQuery {
-    pub hty_ids: Option<Vec<String>>,
-}
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ReqCommonQuery {
