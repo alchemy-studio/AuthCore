@@ -1694,6 +1694,10 @@ async fn register(
     Json(register_info): Json<ReqRegister>,
 ) -> Json<HtyResponse<ReqHtyUserWithInfos>> {
     debug!("register -> starts");
+    debug!("register -> input: unionid={:?}, role={:?}, teacher_id={:?}, real_name={:?}",
+           register_info.unionid.as_ref().map(|s| &s[..10.min(s.len())]),
+           register_info.role, register_info.teacher_id.as_ref().map(|s| &s[..10.min(s.len())]),
+           register_info.real_name);
 
     match raw_register(register_info, host, db_conn, db_pool).await {
         Ok(res) => {
