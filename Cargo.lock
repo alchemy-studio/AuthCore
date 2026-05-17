@@ -4,13 +4,19 @@ version = 4
 
 [[package]]
 name = "aes"
-version = "0.8.4"
+version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b169f7a6d4742236a0a00c541b845991d0ac43e546831af1249753ab4c3aa3a0"
+checksum = "66bd29a732b644c0431c6140f370d097879203d79b80c94a6747ba0872adaef8"
 dependencies = [
+<<<<<<< HEAD
  "cfg-if",
  "cipher 0.4.4",
  "cpufeatures 0.2.17",
+=======
+ "cipher 0.5.1",
+ "cpubits",
+ "cpufeatures 0.3.0",
+>>>>>>> origin/dependabot/cargo/aes-0.9.0
 ]
 
 [[package]]
@@ -271,7 +277,11 @@ version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "98db6aeaef0eeef2c1e3ce9a27b739218825dae116076352ac3777076aa22225"
 dependencies = [
+<<<<<<< HEAD
  "cipher 0.5.1",
+=======
+ "cipher 0.4.4",
+>>>>>>> origin/dependabot/cargo/aes-0.9.0
 ]
 
 [[package]]
@@ -468,6 +478,12 @@ name = "core-foundation-sys"
 version = "0.8.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "773648b94d0e5d620f64f280777445740e61fe701025087ec8b57f45c791888b"
+
+[[package]]
+name = "cpubits"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5ef0c543070d296ea414df2dd7625d1b24866ce206709d8a4a424f28377f5861"
 
 [[package]]
 name = "cpufeatures"
@@ -1258,9 +1274,15 @@ checksum = "135b12329e5e3ce057a9f972339ea52bc954fe1e9358ef27f95e89716fbc5424"
 
 [[package]]
 name = "hybrid-array"
+<<<<<<< HEAD
 version = "0.4.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3944cf8cf766b40e2a1a333ee5e9b563f854d5fa49d6a8ca2764e97c6eddb214"
+=======
+version = "0.4.11"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "08d46837a0ed51fe95bd3b05de33cd64a1ee88fc797477ca48446872504507c5"
+>>>>>>> origin/dependabot/cargo/aes-0.9.0
 dependencies = [
  "typenum",
 ]
@@ -1490,6 +1512,18 @@ dependencies = [
 [[package]]
 name = "inout"
 version = "0.2.2"
+<<<<<<< HEAD
+=======
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4250ce6452e92010fdf7268ccc5d14faa80bb12fc741938534c58f16804e03c7"
+dependencies = [
+ "hybrid-array",
+]
+
+[[package]]
+name = "ipnet"
+version = "2.11.0"
+>>>>>>> origin/dependabot/cargo/aes-0.9.0
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4250ce6452e92010fdf7268ccc5d14faa80bb12fc741938534c58f16804e03c7"
 dependencies = [
