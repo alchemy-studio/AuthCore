@@ -57,7 +57,7 @@ pub fn jwt_decode_token(raw_token: &String) -> Result<HtyToken, HtyErr> {
     validation.validate_exp = false;
     //debug(format!("jwt key -> {:?}", jwt_key()).as_str());
     debug!("jwt_decode_token -> jwt key: {:?}", jwt_key());
-    _jwt_decode_claims(&raw_token, &validation)
+    _jwt_decode_claims(&token, &validation)
 }
 
 
