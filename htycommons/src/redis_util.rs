@@ -197,7 +197,9 @@ pub fn verify_jwt(jwt_token: &String) -> anyhow::Result<()> {
                 Ok(token_in_redis) => {
                     debug!("verify_jwt -> found token in redis: {:?}", token_in_redis);
 
-                    if token_in_redis == jwt_token.clone() {
+                            // Strip "Bearer " prefix before comparing with Redis-stored token
+        let clean_token = if jwt_token.starts_with("Bearer ") { &jwt_token[7..] } else { jwt_token.as_str() };
+        if token_in_redis == clean_token {
                         debug!("verify_jwt -> verify jwt token ok!");
                         Ok(())
                     } else {
