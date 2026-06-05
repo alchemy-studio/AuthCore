@@ -3015,6 +3015,30 @@ fn raw_get_user_groups_of_current_user(
 }
 
 
+async fn claim_hty_resources(
+    auth: AuthorizationHeader,
+    _host: HtyHostHeader,
+    conn: db::DbConn,
+    Json(body): Json<ClaimHtyResourcesReq>,
+) -> Json<HtyResponse<usize>> {
+    match raw_claim_hty_resources(&auth, body, extract_conn(conn).deref_mut()).await {
+        Ok(n) => wrap_json_ok_resp(n),
+        Err(e) => wrap_json_anyhow_err::<usize>(e),
+    }
+}
+
+async fn raw_claim_hty_resources(
+    auth: &AuthorizationHeader,
+    body: ClaimHtyResourcesReq,
+    conn: &mut PgConnection,
+) -> anyhow::Result<usize> {
+    let token = HtyToken::from_jwt(&(*auth).clone())?;
+    let owner = token
+        .hty_id
+        .ok_or_else(|| anyhow!("hty_id is required for claim_hty_resources"))?;
+    HtyResource::claim_by_ids_for_owner(&body.hty_resource_ids, &owner, conn)
+}
+
 async fn delete_hty_resource_by_id(sudoer: HtySudoerTokenHeader,
                                    host: HtyHostHeader,
                                    Path(id_hty_resource): Path<String>,
@@ -7088,6 +7112,7 @@ pub fn uc_rocket(db_url: &str) -> Router {
         .route("/api/v1/uc/register/rollback", post(register_rollback))
         .route("/api/v1/uc/register/verify", post(register_verify))
         .route("/api/v1/uc/create_hty_resource", post(create_hty_resource))
+        .route("/api/v1/uc/claim_hty_resources", post(claim_hty_resources))
         .route("/api/v1/uc/update_hty_resource", post(update_hty_resource))
         .route(
             "/api/v1/uc/create_or_update_user_with_info",

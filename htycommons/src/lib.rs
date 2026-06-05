@@ -21,6 +21,7 @@ pub mod wx;
 pub mod redis_util;
 pub mod cert;
 pub mod models;
+pub mod hty_resource_orphan;
 
 #[macro_use]
 extern crate serde_derive;

@@ -1916,10 +1916,33 @@ pub struct HtyResource {
     pub compress_processed: Option<bool>,
     pub updated_at: Option<NaiveDateTime>,
     pub updated_by: Option<String>,
+    pub is_orphan: bool,
 }
 
 
 impl HtyResource {
+    pub fn claim_by_ids_for_owner(
+        ids: &[String],
+        owner_hty_id: &str,
+        conn: &mut PgConnection,
+    ) -> anyhow::Result<usize> {
+        use crate::schema::hty_resources::dsl::*;
+        if ids.is_empty() {
+            return Ok(0);
+        }
+        let n = diesel::update(
+            hty_resources
+                .filter(hty_resource_id.eq_any(ids.to_vec()))
+                .filter(created_by.eq(owner_hty_id)),
+        )
+        .set((
+            is_orphan.eq(false),
+            updated_at.eq(Some(current_local_datetime())),
+        ))
+        .execute(conn)?;
+        Ok(n)
+    }
+
     pub fn remote_delete_by_id(id_hty_resource: &String, sudoer: &String, host: &String) -> anyhow::Result<()> {
         let c_id = id_hty_resource.clone();
         let c_sudoer = sudoer.clone();
@@ -2039,6 +2062,7 @@ impl HtyResource {
             compress_processed: req.compress_processed.clone(),
             updated_at: req.updated_at.clone(),
             updated_by: req.updated_by.clone(),
+            is_orphan: req.is_orphan.unwrap_or(true),
         })
     }
 
@@ -2090,6 +2114,7 @@ impl HtyResource {
             compress_processed: self.compress_processed.clone(),
             updated_at: self.updated_at.clone(),
             updated_by: self.updated_by.clone(),
+            is_orphan: Some(self.is_orphan),
         }
     }
 }

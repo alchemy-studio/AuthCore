@@ -113,6 +113,7 @@ diesel::table! {
         compress_processed -> Nullable<Bool>,
         updated_at -> Nullable<Timestamp>,
         updated_by -> Nullable<Varchar>,
+        is_orphan -> Bool,
     }
 }
 

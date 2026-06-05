@@ -93,6 +93,13 @@ pub struct ReqHtyResource {
     pub compress_processed: Option<bool>,
     pub updated_at: Option<NaiveDateTime>,
     pub updated_by: Option<String>,
+    /// 默认 true：上传后未挂业务；业务 claim API 置 false
+    pub is_orphan: Option<bool>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ClaimHtyResourcesReq {
+    pub hty_resource_ids: Vec<String>,
 }
 
 #[derive(AsExpression, FromSqlRow, Debug, Serialize, Deserialize, PartialEq, Clone)]
