@@ -311,6 +311,14 @@ pub fn wrap_sudo_err(some_token: &Option<String>) -> String {
 pub fn wrap_anyhow_err<T: Serialize + DeserializeOwned + Debug + Clone>(
     err: anyhow::Error,
 ) -> HtyResponse<T> {
+    if let Some(hty) = err.downcast_ref::<HtyErr>() {
+        return wrap_hty_err(hty.clone());
+    }
+    for cause in err.chain() {
+        if let Some(hty) = cause.downcast_ref::<HtyErr>() {
+            return wrap_hty_err(hty.clone());
+        }
+    }
     HtyResponse {
         r: false,
         d: None,
