@@ -746,6 +746,10 @@ pub struct ReqHtyUserGroup {
     pub group_desc: Option<String>,
     pub parent_id: Option<String>,
     pub owners: Option<MultiVals<GroupUser>>,
+    #[serde(default)]
+    pub managed_kind: Option<String>,
+    #[serde(default)]
+    pub managed_ref_id: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -825,6 +829,10 @@ pub struct ReqHtyUserWithInfos {
     pub infos: Option<Vec<ReqUserAppInfo>>,
     pub info_roles: Option<Vec<ReqUserInfoRole>>,
     pub settings: Option<MultiVals<UserSetting>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub acquisition_source: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub acquisition_ref_id: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -4510,6 +4518,8 @@ pub struct HtyUserGroup {
     pub group_desc: Option<String>,
     pub parent_id: Option<String>,
     pub owners: Option<MultiVals<GroupUser>>,
+    pub managed_kind: String,
+    pub managed_ref_id: Option<String>,
 }
 
 impl HtyUserGroup {
@@ -4636,6 +4646,8 @@ impl HtyUserGroup {
             group_desc: self.group_desc.clone(),
             parent_id: self.parent_id.clone(),
             owners: self.owners.clone(),
+            managed_kind: Some(self.managed_kind.clone()),
+            managed_ref_id: self.managed_ref_id.clone(),
         }
     }
 }

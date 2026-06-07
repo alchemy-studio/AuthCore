@@ -2562,6 +2562,13 @@ fn raw_update_user_group(
         extract_conn(fetch_db_conn(&db_pool)?).deref_mut(),
     )?;
 
+    if db_user_group.managed_kind != "MANUAL" {
+        return Err(anyhow!(HtyErr {
+            code: HtyErrCode::WebErr,
+            reason: Some("系统维护的分组不可编辑".into()),
+        }));
+    }
+
     if req_user_group.users.is_some() {
         db_user_group.users = req_user_group.users.clone();
     }
@@ -2641,6 +2648,8 @@ fn raw_create_user_group(
         group_desc: req_user_group.group_desc.clone(),
         parent_id: req_user_group.parent_id.clone(),
         owners: req_user_group.owners.clone(),
+        managed_kind: "MANUAL".to_string(),
+        managed_ref_id: None,
     };
     let res = HtyUserGroup::create(
         &in_user_group,
@@ -4816,6 +4825,12 @@ async fn delete_user_group(
 fn raw_delete_user_group(id: &String, db_pool: Arc<DbState>) -> anyhow::Result<()> {
     let mut hty_user_group =
         HtyUserGroup::find_by_id(&id, extract_conn(fetch_db_conn(&db_pool)?).deref_mut())?;
+    if hty_user_group.managed_kind != "MANUAL" {
+        return Err(anyhow!(HtyErr {
+            code: HtyErrCode::WebErr,
+            reason: Some("系统维护的分组不可删除".into()),
+        }));
+    }
     hty_user_group.is_delete = true;
     let _ = HtyUserGroup::update(
         &hty_user_group,

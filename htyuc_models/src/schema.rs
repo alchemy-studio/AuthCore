@@ -199,6 +199,8 @@ diesel::table! {
         group_desc -> Nullable<Varchar>,
         parent_id -> Nullable<Varchar>,
         owners -> Nullable<Jsonb>,
+        managed_kind -> Varchar,
+        managed_ref_id -> Nullable<Varchar>,
     }
 }
 
