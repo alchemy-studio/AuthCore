@@ -110,10 +110,7 @@ fn to_public_resp(stored: &LlmGradeConfigStored) -> RespLlmGradeConfig {
         enabled: stored.enabled.unwrap_or(false),
         key_masked,
         grading_self_intro: stored.grading_self_intro.clone(),
-        llm_model: stored
-            .llm_model
-            .clone()
-            .or_else(|| Some("dashscope/qwen3-omni-flash".to_string())),
+        llm_model: stored.llm_model.clone(),
     }
 }
 
@@ -132,10 +129,7 @@ pub fn raw_get_llm_grade_config_internal(user: &HtyUser) -> anyhow::Result<RespL
         enabled: stored.enabled.unwrap_or(false),
         api_key,
         grading_self_intro: stored.grading_self_intro.clone(),
-        llm_model: stored
-            .llm_model
-            .clone()
-            .or_else(|| Some("dashscope/qwen3-omni-flash".to_string())),
+        llm_model: stored.llm_model.clone(),
     })
 }
 
