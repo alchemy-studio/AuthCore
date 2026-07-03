@@ -20,6 +20,7 @@ pub mod web;
 pub mod wx;
 pub mod redis_util;
 pub mod cert;
+pub mod secret_box;
 pub mod models;
 pub mod hty_resource_orphan;
 

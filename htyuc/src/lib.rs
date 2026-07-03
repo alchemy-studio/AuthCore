@@ -40,6 +40,7 @@ pub mod r_uc;
 pub mod ws_org;
 // pub mod invite_code; // moved to huike-back/htyws
 mod notifications;
+pub mod llm_grade_config;
 
 
 // pub mod wx;
@@ -1869,6 +1870,8 @@ async fn raw_register(
         infos: None,
         info_roles: None,
         settings: to_create_user.settings.clone(),
+        acquisition_source: None,
+        acquisition_ref_id: None,
     };
 
     debug!("raw_register -> resp_user_with_infos -> {:?}", resp_user_with_infos);
@@ -5077,6 +5080,8 @@ fn raw_find_users_with_info_by_role(
                 infos: Some(infos),
                 info_roles: None,
                 settings: user.settings.clone(),
+                acquisition_source: None,
+                acquisition_ref_id: None,
             })
         })
         .collect();
@@ -5180,6 +5185,8 @@ fn raw_find_user_with_info_by_id_and_host(
         infos: Some(out_infos),
         info_roles: None,
         settings: out_user.settings.clone(),
+        acquisition_source: None,
+        acquisition_ref_id: None,
     };
 
     debug!("raw_find_user_with_info_by_id_and_host: resp -> {:?}", &resp);
@@ -5337,6 +5344,8 @@ fn raw_find_user_with_info_by_id(
         infos: Some(req_user_app_infos?),
         info_roles: None,
         settings: out_user.settings.clone(),
+        acquisition_source: None,
+        acquisition_ref_id: None,
     };
     Ok(out)
 }
@@ -5452,6 +5461,8 @@ async fn raw_find_user_with_info_by_token(
         infos: Some(infos),
         info_roles: None,
         settings: out_user.settings,
+        acquisition_source: None,
+        acquisition_ref_id: None,
     };
 
     debug(format!("raw_find_user_with_info_by_token -> req_hty_user_with_infos: {:?}", req_hty_user_with_infos).as_str());
@@ -5604,21 +5615,28 @@ fn apply_default_org_context_for_user_info(
     conn: &mut PgConnection,
 ) -> anyhow::Result<()> {
     let members = OrgMember::find_by_user_info_id(user_info_id, conn)?;
-    let mut seen_org_ids = HashSet::new();
-    let mut default_org_id: Option<String> = None;
+    // Pick the org with the earliest membership time; do not rely on table scan order.
+    let mut org_joined_at: HashMap<String, chrono::NaiveDateTime> = HashMap::new();
     for member in members {
-        if !seen_org_ids.insert(member.org_id.clone()) {
-            continue;
-        }
         let organization = Organization::find_by_id(&member.org_id, conn)?;
         if organization.is_delete || organization.app_id != *app_id {
             continue;
         }
-        default_org_id = Some(organization.id);
-        break;
+        org_joined_at
+            .entry(member.org_id.clone())
+            .and_modify(|earliest| {
+                if member.joined_at < *earliest {
+                    *earliest = member.joined_at;
+                }
+            })
+            .or_insert(member.joined_at);
     }
 
-    let Some(target_org_id) = default_org_id else {
+    let Some(target_org_id) = org_joined_at
+        .into_iter()
+        .min_by_key(|(_, joined_at)| *joined_at)
+        .map(|(org_id, _)| org_id)
+    else {
         return Ok(());
     };
 
@@ -6215,6 +6233,8 @@ async fn call_refresh_openid(
         infos: None,
         info_roles: None,
         settings: None,
+        acquisition_source: None,
+        acquisition_ref_id: None,
     };
 
     let mut infos = Vec::new();
@@ -7391,6 +7411,18 @@ pub fn uc_rocket(db_url: &str) -> Router {
         .route("/api/v1/uc/org/department/add_member", post(ws_org::add_department_member))
         .route("/api/v1/uc/org/department/remove_member", post(ws_org::remove_department_member))
         .route("/api/v1/uc/org/department/members/{dept_id}", get(ws_org::list_department_members))
+        .route(
+            "/api/v1/uc/set_llm_grade_config",
+            post(llm_grade_config::set_llm_grade_config),
+        )
+        .route(
+            "/api/v1/uc/get_llm_grade_config",
+            get(llm_grade_config::get_llm_grade_config),
+        )
+        .route(
+            "/api/v1/uc/get_llm_grade_config_internal",
+            post(llm_grade_config::get_llm_grade_config_internal),
+        )
         // invitation codes moved to huike-back/htyws /api/v1/ws/invite_code/*
         .layer(TraceLayer::new_for_http())
         .with_state(shared_db_state);
