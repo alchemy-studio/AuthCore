@@ -31,6 +31,7 @@ use htycommons::upyun::{generate_upyun_token, get_upyun_operator, get_upyun_pass
 use htycommons::web::{get_uc_url, skip_post_login, skip_post_registration, wrap_json_anyhow_err, wrap_json_hty_err, wrap_json_ok_resp, AuthorizationHeader, HtyHostHeader, HtySudoerTokenHeader, HtyToken, ReqHtyAction, ReqHtyLabel, ReqHtyRole, ReqHtyTag, ReqHtyTagRef, ReqTagRefsByRefId, UnionIdHeader, ReqKV};
 use htycommons::wx::{code2session, WxId, WxLogin, WxParams, WxSession};
 use htycommons::{db, uuid};
+use serde::Deserialize;
 
 use tracing::{debug, warn, error};
 use htycommons::models::*;
@@ -5766,6 +5767,135 @@ pub async fn wx_qr_login(State(db_pool): State<Arc<DbState>>, host: HtyHostHeade
     }
 }
 
+const SSO_REDIS_PREFIX: &str = "SSO_C_";
+const SSO_CODE_TTL_SECS: usize = 30;
+
+fn sso_allowed_domains() -> &'static [&'static str] {
+    &[
+        "admin.moicen.com",
+        "ts.moicen.com",
+        "teacher.moicen.com",
+        "admin.huiwings.cn",
+        "ts.huiwings.cn",
+        "teacher.huiwings.cn",
+    ]
+}
+
+fn is_sso_allowed_domain(domain: &str) -> bool {
+    sso_allowed_domains().contains(&domain)
+}
+
+#[derive(Deserialize)]
+struct ReqSsoIssue {
+    jwt: String,
+    app: String,
+}
+
+#[derive(Deserialize)]
+struct ReqSsoExchange {
+    code: String,
+}
+
+#[derive(serde::Serialize, serde::Deserialize)]
+struct SsoCodePayload {
+    jwt: String,
+    app: String,
+}
+
+async fn sso_apps() -> Json<HtyResponse<Vec<String>>> {
+    wrap_json_ok_resp(
+        sso_allowed_domains()
+            .iter()
+            .map(|d| d.to_string())
+            .collect(),
+    )
+}
+
+async fn sso_issue(Json(req): Json<ReqSsoIssue>) -> impl IntoResponse {
+    if !is_sso_allowed_domain(&req.app) {
+        return (
+            StatusCode::BAD_REQUEST,
+            wrap_json_hty_err::<String>(HtyErr {
+                code: HtyErrCode::WebErr,
+                reason: Some("app not allowed for SSO".into()),
+            }),
+        );
+    }
+
+    if jwt_decode_token(&req.jwt).is_err() {
+        return (
+            StatusCode::UNAUTHORIZED,
+            wrap_json_hty_err::<String>(HtyErr {
+                code: HtyErrCode::AuthenticationFailed,
+                reason: Some("invalid jwt".into()),
+            }),
+        );
+    }
+
+    let code = uuid().replace('-', "");
+    let payload = SsoCodePayload {
+        jwt: req.jwt,
+        app: req.app,
+    };
+    let redis_key = format!("{}{}", SSO_REDIS_PREFIX, code);
+    match save_kv_to_redis_with_exp_secs(
+        &redis_key,
+        &serde_json::to_string(&payload).unwrap_or_default(),
+        SSO_CODE_TTL_SECS,
+    ) {
+        Ok(_) => (StatusCode::OK, wrap_json_ok_resp(code)),
+        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, wrap_json_anyhow_err(e)),
+    }
+}
+
+async fn sso_exchange(host: HtyHostHeader, Json(req): Json<ReqSsoExchange>) -> impl IntoResponse {
+    let app_domain = (*host).clone();
+    if !is_sso_allowed_domain(&app_domain) {
+        return (
+            StatusCode::BAD_REQUEST,
+            wrap_json_hty_err::<String>(HtyErr {
+                code: HtyErrCode::WebErr,
+                reason: Some("HtyHost not allowed for SSO exchange".into()),
+            }),
+        );
+    }
+
+    let redis_key = format!("{}{}", SSO_REDIS_PREFIX, req.code);
+    let stored = match get_value_from_redis(&redis_key) {
+        Ok(v) => v,
+        Err(e) => {
+            return (
+                StatusCode::UNAUTHORIZED,
+                wrap_json_anyhow_err(e),
+            );
+        }
+    };
+
+    let _ = del_from_redis(&redis_key);
+
+    let payload: SsoCodePayload = match serde_json::from_str(&stored) {
+        Ok(p) => p,
+        Err(e) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                wrap_json_anyhow_err(anyhow!(e)),
+            );
+        }
+    };
+
+    if payload.app != app_domain {
+        return (
+            StatusCode::FORBIDDEN,
+            wrap_json_hty_err::<String>(HtyErr {
+                code: HtyErrCode::AuthenticationFailed,
+                reason: Some("SSO code app mismatch".into()),
+            }),
+        );
+    }
+
+    (StatusCode::OK, wrap_json_ok_resp(payload.jwt))
+}
+
 async fn raw_wx_qr_login(code: String, app_domain: String, db_pool: Arc<DbState>) -> anyhow::Result<String> {
     debug!("raw_wx_qr_login -> domain: {:?} / code: {:?}", &app_domain, &code);
 
@@ -7199,6 +7329,9 @@ pub fn uc_rocket(db_url: &str) -> Router {
         .route("/api/v1/uc/login_with_password", post(login_with_password))
         .route("/api/v1/uc/login2_with_unionid", get(login2_with_unionid))
         .route("/api/v1/uc/wx_qr_login", post(wx_qr_login))
+        .route("/api/v1/uc/sso/apps", get(sso_apps))
+        .route("/api/v1/uc/sso/issue", post(sso_issue))
+        .route("/api/v1/uc/sso/exchange", post(sso_exchange))
         .route(
             "/api/v1/uc/find_hty_resources_by_task_id/{task_id}",
             get(find_hty_resources_by_task_id),
