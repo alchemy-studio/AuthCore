@@ -26,7 +26,7 @@ chrono = { version = "^0.4", features = ["serde"] }
 clap = { version = "^4.6", features = ["derive", "cargo"] }
 data-encoding = "^2.10"
 diesel = { version = "^2.3", features = ["postgres", "r2d2", "serde_json", "chrono"] }
-generic-array = "^0.14"
+generic-array = "^1.4"
 dotenv = "^0.15"
 hex = "^0.4"
 hex-literal = "^1.1"
