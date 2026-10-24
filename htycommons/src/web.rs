@@ -384,8 +384,14 @@ pub fn get_ws_url() -> String {
     env::var("WS_URL").expect("WS_URL not set!")
 }
 
+pub fn get_wx_mini_url() -> String {
+    env::var("WX_MINI_URL")
+        .or_else(|_| env::var("MUSIC_ROOM_MINI_URL"))
+        .expect("WX_MINI_URL or MUSIC_ROOM_MINI_URL not set!")
+}
+
 pub fn get_music_room_mini_url() -> String {
-    env::var("MUSIC_ROOM_MINI_URL").expect("MUSIC_ROOM_MINI_URL not set!")
+    get_wx_mini_url()
 }
 
 pub fn random_port() -> u16 {

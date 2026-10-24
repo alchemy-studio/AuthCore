@@ -62,12 +62,7 @@ pub struct HtyUser {
 }
 
 
-/*
- * - k: `receive_course_notification`
- * - v: `ON` / `OFF`
- *
- * 是否发送课程通知📢 (只限于定时通知提醒，不包括创建课程，修改课程。)
- */
+/// App-defined key/value. The app chooses `k` and `v`.
 #[derive(AsExpression, FromSqlRow, Debug, Default, Serialize, Deserialize, PartialEq, Clone)]
 #[diesel(sql_type = Jsonb)]
 pub struct UserSetting {

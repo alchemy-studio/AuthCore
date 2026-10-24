@@ -53,11 +53,12 @@ pub struct ReqComment {
     pub is_delete: Option<bool>,
     pub comment_type: Option<String>,
     pub comment_status: Option<String>,
-    pub has_piyue: Option<bool>,
-    pub has_score: Option<bool>,
     pub ref_resources: Option<Vec<ReqRefResource>>,
     // this is selected out by runtime, not stored in db.
     pub creator_role_key: Option<String>,
+    /// Flat keys such as `has_piyue` / `has_score`. Callers own the meaning.
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
 }
 
 
@@ -115,7 +116,7 @@ impl Default for ConvertAudioFileTask {
         ConvertAudioFileTask {
             media_id: None,
             task_id: None,
-            task_type: "CONVERT_AUDIO_FILE".to_string(),
+            task_type: String::new(),
         }
     }
 }
@@ -146,13 +147,15 @@ pub struct ReqRefResource {
     pub ref_desc: Option<String>,
     // pub meta: Option<MultiVals<ReqRefResource>>, // deprecated, re-design
     pub tasks: Option<MultiVals<CommonTask>>,
-    pub is_shifan: Option<bool>,
     pub created_at: Option<NaiveDateTime>,
     pub updated_at: Option<NaiveDateTime>,
     pub compress_processed: Option<bool>,
     pub created_by: Option<String>,
     pub synced_with_hty_resource: Option<bool>,
     pub updated_by: Option<String>,
+    /// Flat keys such as `is_shifan`. Callers own the meaning.
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
 }
 
 
@@ -163,16 +166,45 @@ pub struct CommonTongzhiContent {
     pub from_user: Option<String>,
     pub created_at: Option<NaiveDateTime>,
     pub content: Option<String>,
-    pub qumu_sections: Option<Vec<String>>,
-    pub piyue_id: Option<String>,
-    pub beizhu: Option<String>,
-    pub lianxi_id: Option<String>,
-    pub jihua_id: Option<String>,
-    pub jihua_start_from: Option<NaiveDateTime>,
-    pub jihua_end_at: Option<NaiveDateTime>,
-    pub daka_id: Option<String>,
-    pub daka_start_date: Option<NaiveDateTime>,
-    pub daka_duration_days: Option<i32>,
+    /// Flat keys. Legacy rows stay flat Json.
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+pub fn json_extra_bool(extra: &Map<String, Value>, key: &str) -> Option<bool> {
+    match extra.get(key) {
+        Some(Value::Bool(value)) => Some(*value),
+        _ => None,
+    }
+}
+
+#[cfg(test)]
+mod extra_roundtrip_tests {
+    use super::*;
+
+    #[test]
+    fn tongzhi_business_keys_stay_flat() {
+        let raw = r#"{"to_user":"a","qumu_sections":["s1"],"daka_duration_days":3}"#;
+        let parsed: CommonTongzhiContent = serde_json::from_str(raw).expect("parse");
+        assert_eq!(
+            parsed.extra.get("qumu_sections"),
+            Some(&serde_json::json!(["s1"]))
+        );
+        let back = serde_json::to_value(&parsed).expect("serialize");
+        assert_eq!(back["daka_duration_days"], 3);
+        assert!(back.get("extra").is_none());
+    }
+
+    #[test]
+    fn comment_flags_stay_flat() {
+        let raw = r#"{"has_piyue":true,"has_score":false}"#;
+        let parsed: ReqComment = serde_json::from_str(raw).expect("parse");
+        assert_eq!(json_extra_bool(&parsed.extra, "has_piyue"), Some(true));
+        assert_eq!(json_extra_bool(&parsed.extra, "has_score"), Some(false));
+        let back = serde_json::to_value(&parsed).expect("serialize");
+        assert_eq!(back["has_piyue"], true);
+        assert!(back.get("extra").is_none());
+    }
 }
 
 impl_jsonb_boilerplate!(CommonTongzhiContent);

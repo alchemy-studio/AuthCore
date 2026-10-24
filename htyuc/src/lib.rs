@@ -5770,19 +5770,19 @@ pub async fn wx_qr_login(State(db_pool): State<Arc<DbState>>, host: HtyHostHeade
 const SSO_REDIS_PREFIX: &str = "SSO_C_";
 const SSO_CODE_TTL_SECS: usize = 30;
 
-fn sso_allowed_domains() -> &'static [&'static str] {
-    &[
-        "admin.moicen.com",
-        "ts.moicen.com",
-        "teacher.moicen.com",
-        "admin.huiwings.cn",
-        "ts.huiwings.cn",
-        "teacher.huiwings.cn",
-    ]
+fn sso_allowed_domains() -> Vec<String> {
+    match std::env::var("SSO_ALLOWED_DOMAINS") {
+        Ok(raw) => raw
+            .split(',')
+            .map(|item| item.trim().to_string())
+            .filter(|item| !item.is_empty())
+            .collect(),
+        Err(_) => Vec::new(),
+    }
 }
 
 fn is_sso_allowed_domain(domain: &str) -> bool {
-    sso_allowed_domains().contains(&domain)
+    sso_allowed_domains().iter().any(|item| item == domain)
 }
 
 #[derive(Deserialize)]
@@ -5803,12 +5803,7 @@ struct SsoCodePayload {
 }
 
 async fn sso_apps() -> Json<HtyResponse<Vec<String>>> {
-    wrap_json_ok_resp(
-        sso_allowed_domains()
-            .iter()
-            .map(|d| d.to_string())
-            .collect(),
-    )
+    wrap_json_ok_resp(sso_allowed_domains())
 }
 
 async fn sso_issue(Json(req): Json<ReqSsoIssue>) -> impl IntoResponse {
@@ -5861,12 +5856,23 @@ async fn sso_exchange(host: HtyHostHeader, Json(req): Json<ReqSsoExchange>) -> i
     }
 
     let redis_key = format!("{}{}", SSO_REDIS_PREFIX, req.code);
-    let stored = match get_value_from_redis(&redis_key) {
-        Ok(v) => v,
-        Err(e) => {
+    let stored = match get_opt_value_from_redis(&redis_key) {
+        Ok(Some(v)) => v,
+        Ok(None) => {
             return (
                 StatusCode::UNAUTHORIZED,
-                wrap_json_anyhow_err(e),
+                wrap_json_hty_err::<String>(HtyErr {
+                    code: HtyErrCode::AuthenticationFailed,
+                    reason: Some(
+                        "SSO 授权码已过期或已使用，请重新登录".into(),
+                    ),
+                }),
+            );
+        }
+        Err(e) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                wrap_json_anyhow_err::<String>(e),
             );
         }
     };

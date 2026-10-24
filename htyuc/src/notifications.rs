@@ -661,16 +661,7 @@ fn build_hty_tongzhi<T: Serialize>(
         from_user: send_from_real_name,
         created_at: Some(current_local_datetime()),
         content: Some(wx_first_value.clone()),
-        qumu_sections: None,
-        piyue_id: None,
-        beizhu: None,
-        lianxi_id: None,
-        jihua_id: None,
-        jihua_start_from: None,
-        jihua_end_at: None,
-        daka_id: None,
-        daka_start_date: None,
-        daka_duration_days: None,
+        extra: Default::default(),
     };
     let send_from_hty_id = send_from.clone().map(|item| item.hty_id);
     let hty_tongzhi = HtyTongzhi {
